@@ -54,6 +54,7 @@ describe("buildPreviewDocument", () => {
     expect(document.head.firstElementChild?.tagName).toBe("BASE");
     expect(scripts[0]?.dataset.htmlPreviewBridge).toBe("true");
     expect(scripts[0]?.textContent).toContain("render-42");
+    expect(scripts[0]?.textContent).toContain("bridgeScript?.remove()");
     expect(scripts[1]?.textContent).toContain("authorScript");
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({ code: "replaced-base", level: "warning" })
@@ -125,4 +126,3 @@ describe("buildPreviewDocument", () => {
     );
   });
 });
-

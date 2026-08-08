@@ -36,7 +36,10 @@ function createLeaf(app: unknown): WorkspaceLeaf {
   return leaf;
 }
 
-function createHarness(read = vi.fn(async () => "<h1>Hello</h1>")) {
+function createHarness(
+  read = vi.fn(async () => "<h1>Hello</h1>"),
+  allowScripts = true
+) {
   const openLinkText = vi.fn(async () => undefined);
   const app = {
     vault: {
@@ -51,7 +54,7 @@ function createHarness(read = vi.fn(async () => "<h1>Hello</h1>")) {
     coordinator,
     createRenderId: () => "render-test",
     getKnownVaultPaths: () => new Set(["pages/guide.html"]),
-    getSettings: () => ({ allowScripts: true }),
+    getSettings: () => ({ allowScripts }),
     openExternal
   });
   view.onload();
@@ -77,6 +80,19 @@ describe("HtmlPreviewView", () => {
     );
     expect(iframe?.srcdoc).toContain("<h1>Hello</h1>");
     expect(view.contentEl.classList.contains("html-preview-view")).toBe(true);
+  });
+
+  it("removes script permission from the sandbox when JavaScript is disabled", async () => {
+    const { view } = createHarness(
+      vi.fn(async () => `<button onclick="window.ran = true">Run</button>`),
+      false
+    );
+
+    await view.onLoadFile(createFile("pages/index.html"));
+
+    expect(view.contentEl.querySelector("iframe")?.getAttribute("sandbox")).toBe(
+      "allow-forms allow-modals allow-popups allow-downloads"
+    );
   });
 
   it("ignores a stale file read after a newer render completes", async () => {

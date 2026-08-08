@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "validate": "node scripts/validate-release.mjs"
+    "validate": "node scripts/validate-release.mjs",
+    "check": "npm test && npm run typecheck && npm run build && npm run validate"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
@@ -23,4 +24,3 @@
     "vitest": "^4.1.1"
   }
 }
-

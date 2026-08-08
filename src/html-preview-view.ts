@@ -1,7 +1,10 @@
 import { FileView, TFile, WorkspaceLeaf } from "obsidian";
 
 import { DiagnosticsModal, type DisplayDiagnostic } from "./diagnostics-modal";
-import { NAVIGATION_MESSAGE_TYPE } from "./preview/bridge-script";
+import {
+  createRenderId,
+  NAVIGATION_MESSAGE_TYPE
+} from "./preview/bridge-script";
 import { buildPreviewDocument } from "./preview/document-builder";
 import { classifyNavigation } from "./preview/navigation";
 import type { PreviewCoordinator } from "./preview/preview-coordinator";
@@ -11,6 +14,8 @@ import type { HtmlPreviewSettings } from "./settings";
 export const HTML_PREVIEW_VIEW_TYPE = "html-preview";
 const SANDBOX_FLAGS =
   "allow-scripts allow-forms allow-modals allow-popups allow-downloads";
+const SCRIPT_FREE_SANDBOX_FLAGS =
+  "allow-forms allow-modals allow-popups allow-downloads";
 
 export interface HtmlPreviewEnvironment {
   coordinator: PreviewCoordinator;
@@ -21,7 +26,6 @@ export interface HtmlPreviewEnvironment {
 }
 
 let nextViewId = 0;
-let nextRenderId = 0;
 
 function isNavigationMessage(value: unknown): value is PreviewNavigationMessage {
   if (typeof value !== "object" || value === null) {
@@ -136,8 +140,7 @@ export class HtmlPreviewView extends FileView {
     }
 
     const token = ++this.renderToken;
-    const renderId =
-      this.environment.createRenderId?.() ?? `render-${++nextRenderId}`;
+    const renderId = this.environment.createRenderId?.() ?? createRenderId();
 
     try {
       const source = await this.app.vault.cachedRead(file);
@@ -159,7 +162,12 @@ export class HtmlPreviewView extends FileView {
 
       const frame = document.createElement("iframe");
       frame.className = "html-preview-frame";
-      frame.setAttribute("sandbox", SANDBOX_FLAGS);
+      frame.setAttribute(
+        "sandbox",
+        this.environment.getSettings().allowScripts
+          ? SANDBOX_FLAGS
+          : SCRIPT_FREE_SANDBOX_FLAGS
+      );
       frame.setAttribute("title", `Preview of ${file.name}`);
       frame.srcdoc = result.html;
       this.contentEl.replaceChildren(frame);
@@ -237,4 +245,3 @@ export class HtmlPreviewView extends FileView {
     this.frame = null;
   }
 }
-

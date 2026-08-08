@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Self-contained HTML fixture</title>
+    <style>
+      body { margin: 0; font: 16px/1.5 system-ui, sans-serif; }
+      main { max-width: 42rem; margin: 10vh auto; padding: 1.5rem; }
+      output { display: block; margin-top: 1rem; color: #176b46; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Self-contained page</h1>
+      <p>This file verifies inline styles and scripts.</p>
+      <button id="run" type="button">Run script</button>
+      <output id="result">Waiting</output>
+    </main>
+    <script>
+      document.querySelector("#run").addEventListener("click", () => {
+        document.querySelector("#result").textContent = "Script executed";
+      });
+    </script>
+  </body>
+</html>
+
