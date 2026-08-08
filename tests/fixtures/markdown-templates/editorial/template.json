@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "editorial",
+  "name": "Editorial",
+  "defaultTheme": "light",
+  "themes": [
+    { "id": "light", "name": "Light", "stylesheet": "themes/light.css" }
+  ]
+}

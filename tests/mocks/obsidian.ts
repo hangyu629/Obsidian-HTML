@@ -19,6 +19,22 @@ export class Component {
       cleanup();
     }
   }
+
+  unload(): void {
+    this.onunload();
+  }
+}
+
+export class MarkdownRenderer {
+  static async render(
+    _app: unknown,
+    markdown: string,
+    element: HTMLElement,
+    _sourcePath: string,
+    _component: Component
+  ): Promise<void> {
+    element.textContent = markdown;
+  }
 }
 
 export class TFile {
@@ -36,6 +52,8 @@ export class TFile {
 
 export class WorkspaceLeaf {
   constructor(public app: unknown) {}
+
+  async setViewState(): Promise<void> {}
 }
 
 export class ItemView extends Component {
@@ -111,6 +129,7 @@ export class Plugin extends Component {
   registeredExtensions: Array<{ extensions: string[]; viewType: string }> = [];
   registeredViews = new Map<string, (leaf: WorkspaceLeaf) => ItemView>();
   settingTabs: unknown[] = [];
+  commands: Array<Record<string, unknown>> = [];
   private data: unknown = null;
 
   constructor(app: unknown = {}, manifest: unknown = {}) {
@@ -138,13 +157,25 @@ export class Plugin extends Component {
     this.registeredViews.set(viewType, creator);
   }
 
+  addCommand(command: Record<string, unknown>): void {
+    this.commands.push(command);
+  }
+
   async saveData(data: unknown): Promise<void> {
     this.data = data;
   }
 }
-export class PluginSettingTab extends Component {}
+export class PluginSettingTab extends Component {
+  containerEl = document.createElement("div");
+}
 export class Setting {
   constructor(_container: HTMLElement) {}
+  setName(_name: string): this { return this; }
+  setDesc(_description: string): this { return this; }
+  addToggle(callback: (toggle: this) => unknown): this { callback(this); return this; }
+  setValue(_value: unknown): this { return this; }
+  onChange(_callback: (value: unknown) => unknown): this { return this; }
+  addText(callback: (text: this) => unknown): this { callback(this); return this; }
 }
 
 export class Notice {

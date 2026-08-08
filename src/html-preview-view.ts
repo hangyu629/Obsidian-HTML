@@ -40,7 +40,7 @@ export interface HtmlPreviewEnvironment {
   createRenderId?: () => string;
   createRuleId?: () => string;
   getKnownVaultPaths(): ReadonlySet<string>;
-  getSettings(): HtmlPreviewSettings;
+  getSettings(): Pick<HtmlPreviewSettings, "allowScripts">;
   openExternal(url: string): void;
   showNotice(message: string): void;
 }

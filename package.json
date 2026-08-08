@@ -1,6 +1,6 @@
 {
   "name": "obsidian-html-preview",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Preview and non-destructively clean up HTML files in Obsidian.",
   "private": true,
   "type": "module",

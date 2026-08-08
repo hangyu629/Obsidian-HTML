@@ -1,0 +1,14 @@
+.editorial-page {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 3rem clamp(1rem, 5vw, 5rem);
+}
+
+.editorial-page [data-slot="title"] {
+  margin-bottom: 2rem;
+  font-size: 2.4rem;
+}
+
+.editorial-page [data-slot="content"] {
+  line-height: 1.7;
+}
