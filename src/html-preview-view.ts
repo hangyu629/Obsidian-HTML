@@ -150,6 +150,7 @@ export class HtmlPreviewView extends FileView {
 
       const result = buildPreviewDocument({
         allowScripts: this.environment.getSettings().allowScripts,
+        cleanupRules: [],
         knownVaultPaths: this.environment.getKnownVaultPaths(),
         renderId,
         resourceUrl: this.app.vault.getResourcePath(file),

@@ -1,3 +1,5 @@
+import type { CleanupRule } from "../cleanup/types";
+
 export type DiagnosticLevel = "info" | "warning" | "error";
 
 export interface PreviewDiagnostic {
@@ -13,6 +15,7 @@ export interface PreviewDiagnostic {
 
 export interface BuildPreviewInput {
   allowScripts: boolean;
+  cleanupRules: readonly CleanupRule[];
   knownVaultPaths: ReadonlySet<string>;
   renderId: string;
   resourceUrl: string;
@@ -31,4 +34,3 @@ export interface PreviewNavigationMessage {
   renderId: string;
   href: string;
 }
-

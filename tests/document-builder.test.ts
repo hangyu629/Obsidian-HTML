@@ -13,6 +13,7 @@ const knownVaultPaths = new Set([
 function build(source: string, allowScripts = true) {
   return buildPreviewDocument({
     allowScripts,
+    cleanupRules: [],
     knownVaultPaths,
     renderId: "render-42",
     resourceUrl: "app://vault/pages/index.html?cache=123",
@@ -112,6 +113,7 @@ describe("buildPreviewDocument", () => {
   it("reports an invalid Vault resource URL and falls back to about:blank", () => {
     const result = buildPreviewDocument({
       allowScripts: true,
+      cleanupRules: [],
       knownVaultPaths,
       renderId: "render-1",
       resourceUrl: "not a url",
@@ -124,5 +126,36 @@ describe("buildPreviewDocument", () => {
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({ code: "invalid-resource-url", level: "error" })
     );
+  });
+
+  it("embeds validated cleanup rules in the self-removing runtime", () => {
+    const result = buildPreviewDocument({
+      allowScripts: true,
+      cleanupRules: [
+        {
+          createdAt: "2026-08-07T12:00:00.000Z",
+          fingerprint: {
+            ancestors: [],
+            attributes: {},
+            classes: ["sidebar"],
+            tag: "aside",
+            text: "Related"
+          },
+          id: "0123456789abcdef0123456789abcdef",
+          scope: "file",
+          selector: "aside.sidebar",
+          sourcePath: "pages/index.html"
+        }
+      ],
+      knownVaultPaths,
+      renderId: "render-cleanup",
+      resourceUrl: "app://vault/pages/index.html",
+      source: "<aside class=\"sidebar\">Related</aside>",
+      sourcePath: "pages/index.html"
+    });
+
+    expect(result.html).toContain("aside.sidebar");
+    expect(result.html).toContain("render-cleanup");
+    expect(result.html).toContain("bridgeScript?.remove()");
   });
 });
