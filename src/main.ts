@@ -107,17 +107,19 @@ export default class HtmlPreviewPlugin extends Plugin {
       }
     });
 
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", (leaf) => {
-        this.installMarkdownAction(leaf);
-        void this.maybeAutoOpen(leaf);
-      })
-    );
-    this.registerEvent(
-      this.app.workspace.on("file-open", () => {
-        void this.maybeAutoOpen(this.app.workspace.activeLeaf);
-      })
-    );
+    if (typeof this.app.workspace.on === "function") {
+      this.registerEvent(
+        this.app.workspace.on("active-leaf-change", (leaf) => {
+          this.installMarkdownAction(leaf);
+          void this.maybeAutoOpen(leaf);
+        })
+      );
+      this.registerEvent(
+        this.app.workspace.on("file-open", () => {
+          void this.maybeAutoOpen(this.app.workspace.activeLeaf);
+        })
+      );
+    }
 
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
