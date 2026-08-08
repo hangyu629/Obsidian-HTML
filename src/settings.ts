@@ -19,6 +19,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function normalizeTemplateId(value: string): string {
+  return value === "minimal" ? "book-editorial" : value;
+}
+
 function normalizeMappings(value: unknown): FolderTemplateMapping[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -28,9 +32,7 @@ function normalizeMappings(value: unknown): FolderTemplateMapping[] {
       folder: typeof mapping.folder === "string" ? mapping.folder.trim() : "",
       templateId:
         typeof mapping.templateId === "string"
-          ? mapping.templateId.trim() === "minimal"
-            ? "book-editorial"
-            : mapping.templateId.trim()
+          ? normalizeTemplateId(mapping.templateId.trim())
           : "",
       themeId: typeof mapping.themeId === "string" ? mapping.themeId.trim() : undefined
     }))
@@ -45,9 +47,7 @@ export function normalizeSettings(value: unknown): HtmlPreviewSettings {
       typeof stored.autoEnhanced === "boolean" ? stored.autoEnhanced : true,
     defaultTemplateId:
       typeof stored.defaultTemplateId === "string" && stored.defaultTemplateId.length > 0
-        ? stored.defaultTemplateId === "minimal"
-          ? "book-editorial"
-          : stored.defaultTemplateId
+        ? normalizeTemplateId(stored.defaultTemplateId)
         : DEFAULT_SETTINGS.defaultTemplateId,
     defaultThemeId:
       typeof stored.defaultThemeId === "string" && stored.defaultThemeId.length > 0
@@ -99,7 +99,8 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
         text
           .setValue(this.plugin.settings.defaultTemplateId)
           .onChange(async (value) => {
-            this.plugin.settings.defaultTemplateId = value.trim() || "book-editorial";
+            this.plugin.settings.defaultTemplateId =
+              normalizeTemplateId(value.trim()) || "book-editorial";
             await this.plugin.saveSettings();
           })
       );
@@ -135,7 +136,13 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
       const update = async (changes: Partial<typeof mapping>): Promise<void> => {
         this.plugin.settings.folderMappings = this.plugin.settings.folderMappings.map(
           (current, currentIndex) =>
-            currentIndex === index ? { ...current, ...changes } : current
+            currentIndex === index
+              ? {
+                  ...current,
+                  ...changes,
+                  templateId: normalizeTemplateId(changes.templateId ?? current.templateId)
+                }
+              : current
         );
         await this.plugin.saveSettings();
       };
