@@ -129,6 +129,10 @@
   color: var(--text-muted);
 }
 
+.html-preview-cleanup-rule code[title] {
+  cursor: help;
+}
+
 .html-preview-cleanup-rules {
   display: grid;
   margin: 0;
