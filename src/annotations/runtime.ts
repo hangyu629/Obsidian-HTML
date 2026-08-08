@@ -100,6 +100,93 @@ export function createAnnotationRuntimeScript(
       return null;
     };
 
+    const visibleText = () => textNodes().map((node) => node.textContent || "").join("");
+
+    const visiblePosition = (container, offset) => {
+      let position = 0;
+      const prefix = document.createRange();
+      prefix.setStart(document.body, 0);
+      prefix.setEnd(container, offset);
+      for (const node of textNodes()) {
+        const length = node.textContent ? node.textContent.length : 0;
+        if (node === container) return position + Math.max(0, Math.min(offset, length));
+        if (!prefix.intersectsNode(node)) return position;
+        position += length;
+      }
+      return position;
+    };
+
+    const normalize = (value) => value.replace(/\\s+/g, " ").trim();
+
+    const normalizedText = (value) => {
+      let text = "";
+      const starts = [];
+      const ends = [];
+      let index = 0;
+      while (index < value.length) {
+        if (!/\\s/.test(value[index])) {
+          text += value[index];
+          starts.push(index);
+          ends.push(index + 1);
+          index += 1;
+          continue;
+        }
+        const start = index;
+        while (index < value.length && /\\s/.test(value[index])) index += 1;
+        if (text.length > 0 && index < value.length) {
+          text += " ";
+          starts.push(start);
+          ends.push(index);
+        }
+      }
+      return { ends, starts, text };
+    };
+
+    const matchingContext = (left, right, fromEnd) => {
+      const limit = Math.min(left.length, right.length);
+      let matched = 0;
+      for (let length = 1; length <= limit; length += 1) {
+        const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
+        const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
+        if (leftPart === rightPart) matched = length;
+      }
+      return matched;
+    };
+
+    const resolveTarget = (target) => {
+      const fullText = visibleText();
+      const exact = normalize(target.exact || "");
+      if (!exact) return null;
+      if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
+          normalize(fullText.slice(target.start, target.end)) === exact) {
+        return { end: target.end, start: target.start };
+      }
+
+      const model = normalizedText(fullText);
+      const candidates = [];
+      let normalizedStart = model.text.indexOf(exact);
+      while (normalizedStart >= 0) {
+        const normalizedEnd = normalizedStart + exact.length;
+        const start = model.starts[normalizedStart];
+        const end = model.ends[normalizedEnd - 1];
+        if (typeof start === "number" && typeof end === "number") {
+          const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
+          const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
+          const targetPrefix = normalize(target.prefix || "");
+          const targetSuffix = normalize(target.suffix || "");
+          candidates.push({
+            end,
+            score: matchingContext(prefix, targetPrefix, true) + matchingContext(suffix, targetSuffix, false),
+            start
+          });
+        }
+        normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
+      }
+      candidates.sort((left, right) => right.score - left.score ||
+        Math.abs(left.start - target.start) - Math.abs(right.start - target.start));
+      return candidates[0] || null;
+    };
+
     const rangeFromOffsets = (start, end) => {
       const startPoint = resolveOffset(start);
       const endPoint = resolveOffset(end);
@@ -151,13 +238,21 @@ export function createAnnotationRuntimeScript(
         styleMarks(annotation);
         return true;
       }
-      const range = rangeFromOffsets(annotation.target.start, annotation.target.end);
+      const resolved = resolveTarget(annotation.target);
+      if (!resolved) return false;
+      annotation.target.start = resolved.start;
+      annotation.target.end = resolved.end;
+      const range = rangeFromOffsets(resolved.start, resolved.end);
       if (!range) return false;
       wrapRange(range, annotation);
       return true;
     };
 
-    for (const annotation of initialAnnotations) applyAnnotation(annotation);
+    const applyInitialAnnotations = () => {
+      for (const annotation of initialAnnotations) applyAnnotation(annotation);
+    };
+    if (document.body) applyInitialAnnotations();
+    else document.addEventListener("DOMContentLoaded", applyInitialAnnotations, { once: true });
 
     const removeAnnotation = (id) => {
       for (const mark of markElements(id)) mark.replaceWith(...Array.from(mark.childNodes));
@@ -275,13 +370,6 @@ export function createAnnotationRuntimeScript(
       textarea.focus();
     };
 
-    const bodyPosition = (container, offset) => {
-      const range = document.createRange();
-      range.setStart(document.body, 0);
-      range.setEnd(container, offset);
-      return range.toString().length;
-    };
-
     const captureSelection = () => {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
@@ -289,9 +377,9 @@ export function createAnnotationRuntimeScript(
       if (!document.body.contains(range.startContainer) || !document.body.contains(range.endContainer)) return null;
       const exact = range.toString().replace(/\\s+/g, " ").trim();
       if (!exact) return null;
-      const start = bodyPosition(range.startContainer, range.startOffset);
-      const end = bodyPosition(range.endContainer, range.endOffset);
-      const fullText = document.body.textContent || "";
+      const start = visiblePosition(range.startContainer, range.startOffset);
+      const end = visiblePosition(range.endContainer, range.endOffset);
+      const fullText = visibleText();
       return {
         anchor: range.getBoundingClientRect ? range.getBoundingClientRect() : new DOMRect(),
         draft: {
