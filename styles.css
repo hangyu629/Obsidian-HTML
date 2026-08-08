@@ -24,6 +24,29 @@
   margin: 0;
 }
 
+.view-content.enhanced-markdown-view {
+  overflow: auto;
+  padding: 0;
+}
+
+.enhanced-markdown-document {
+  min-height: 100%;
+  color: var(--text-normal);
+  background: var(--background-primary);
+}
+
+.enhanced-markdown-state {
+  padding: var(--size-4-6);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.enhanced-markdown-template-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2);
+}
+
 .html-preview-diagnostics {
   display: grid;
   gap: var(--size-4-2);

@@ -38,6 +38,33 @@ Restart Obsidian, open **Settings -> Community plugins**, and enable **HTML Prev
 4. Select **Clean up page**, then point to and select an unwanted region. On touch devices, confirm with **Hide**.
 5. Use **Undo cleanup** for the latest cleanup made in the current view, or **Manage cleanup rules** to restore, promote, or reset persistent rules.
 
+## Enhanced Markdown Reading
+
+Enhanced reading keeps the normal Markdown editor and source file intact. Use the **Enhanced reading** command or the book action on a Markdown view to open a rendered page. The renderer is Obsidian's native `MarkdownRenderer`, so core headings, lists, tables, tasks, callouts, code, math, links, embeds, Properties, and footnotes retain Obsidian behavior. Use **Open native Markdown** to return to the normal view.
+
+Templates are Vault-backed packages under:
+
+```text
+.html-preview/markdown-templates/<template-id>/
+  template.json
+  layout.html
+  styles.css
+  themes/
+  assets/
+```
+
+Layouts may define one each of `data-slot="title"`, `properties`, `toc`, and the required `data-slot="content"`. CSS is scoped to the enhanced view root. Template packages contain HTML, CSS, metadata, themes, and local assets only; scripts, forms, frames, external resources, and event-handler attributes are rejected.
+
+Automatic enhanced reading is enabled in settings and applies only when a note matches a rule. A frontmatter rule has highest priority:
+
+```yaml
+html-preview:
+  template: editorial
+  theme: light
+```
+
+The equivalent flat keys are `html-preview.template` and `html-preview.theme`. When no frontmatter rule matches, the most specific configured folder mapping is used. Manual opening uses the configured default template and theme when no rule matches. Third-party Markdown processors continue to work through Obsidian's native renderer boundary; this plugin does not reimplement them.
+
 ## Page Cleanup
 
 Cleanup changes only the preview DOM. The HTML file and its asset files are never edited. New rules apply to the current file by default. In **Manage cleanup rules**, a file rule can be promoted to its containing folder so it also applies to other HTML files under that folder.
@@ -93,5 +120,7 @@ Fixtures for manual Vault smoke testing are in `tests/fixtures/`.
 清理规则保存在 Vault 内的 `.html-preview/cleanup/`。默认规则只作用于当前 HTML；提升后的文件夹规则作用于该目录及子目录。重命名 HTML 文件时会迁移文件规则，但整目录重命名不会自动改写文件夹规则。同步工具是否同步这些数据，取决于它是否包含隐藏目录。
 
 清理功能依赖 **Allow page JavaScript**；关闭此设置后不会应用规则，也不能选择元素。跨域 iframe、canvas、视频或图片内部的内容不能单独选择，只能隐藏它们的外层元素。
+
+增强 Markdown 阅读不会改变 `.md` 源文件。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 Vault 的 `.html-preview/markdown-templates/` 中保存完整布局模板。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
 
 首次使用前请阅读上面的 **Security** 与 **Compatibility Limits**。不信任的 HTML 可能通过脚本发起网络请求，可在插件设置中关闭 **Allow page JavaScript**。
