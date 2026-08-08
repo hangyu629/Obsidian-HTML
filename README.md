@@ -10,6 +10,7 @@ Preview `.html` and `.htm` files stored in an Obsidian Vault. HTML remains an or
 - Opens Vault-local links through Obsidian and web, email, or telephone links externally.
 - Runs page JavaScript by default in a sandboxed iframe.
 - Hides unwanted page regions with reversible file- or folder-scoped cleanup rules.
+- Adds file-scoped annotations to HTML previews without changing the source HTML.
 - Supports Obsidian Desktop, iOS, and Android without a local server or Electron-only APIs.
 - Never changes the source HTML or its assets.
 
@@ -37,6 +38,7 @@ Restart Obsidian, open **Settings -> Community plugins**, and enable **HTML Prev
 3. Select the HTML file in Obsidian's file explorer.
 4. Select **Clean up page**, then point to and select an unwanted region. On touch devices, confirm with **Hide**.
 5. Use **Undo cleanup** for the latest cleanup made in the current view, or **Manage cleanup rules** to restore, promote, or reset persistent rules.
+6. Select **Add annotation**, then highlight text inside the HTML page. Enter a note when prompted. Use **Manage annotations** to review or delete saved annotations.
 
 ## Enhanced Markdown Reading
 
@@ -70,6 +72,8 @@ The equivalent flat keys are `html-preview.template` and `html-preview.theme`. W
 ## Page Cleanup
 
 Cleanup changes only the preview DOM. The HTML file and its asset files are never edited. New rules apply to the current file by default. In **Manage cleanup rules**, a file rule can be promoted to its containing folder so it also applies to other HTML files under that folder.
+
+HTML annotations also change only the preview DOM. They are stored separately from the page source and replayed when the same HTML file is opened again. This annotation layer applies only to HTML previews; it does not appear in enhanced Markdown reading.
 
 Rules are stored inside the Vault:
 

@@ -1,10 +1,12 @@
 import { Notice, Plugin, TFile } from "obsidian";
 
+import { HtmlAnnotationStore } from "./annotations/annotation-store";
 import { CleanupRuleStore } from "./cleanup/rule-store";
 import {
   HtmlPreviewView,
   HTML_PREVIEW_VIEW_TYPE
 } from "./html-preview-view";
+import { createRenderId } from "./preview/bridge-script";
 import { PreviewCoordinator } from "./preview/preview-coordinator";
 import {
   DEFAULT_SETTINGS,
@@ -26,6 +28,7 @@ import { MarkdownTemplateModal } from "./markdown/template-modal";
 
 export default class HtmlPreviewPlugin extends Plugin {
   readonly coordinator = new PreviewCoordinator();
+  annotationStore!: HtmlAnnotationStore;
   cleanupStore!: CleanupRuleStore;
   settings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   markdownTemplateCatalog!: MarkdownTemplateCatalog;
@@ -45,6 +48,7 @@ export default class HtmlPreviewPlugin extends Plugin {
         new Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
       }
     );
+    this.annotationStore = new HtmlAnnotationStore(this.app.vault.adapter as never);
 
     this.markdownTemplateCatalog = new MarkdownTemplateCatalog(
       this.app.vault.adapter as MarkdownTemplateCatalogAdapter
@@ -88,13 +92,16 @@ export default class HtmlPreviewPlugin extends Plugin {
       HTML_PREVIEW_VIEW_TYPE,
       (leaf) =>
         new HtmlPreviewView(leaf, {
+          annotationStore: this.annotationStore,
           cleanupStore: this.cleanupStore,
           coordinator: this.coordinator,
+          createAnnotationId: () => createRenderId(),
           getKnownVaultPaths: () => this.knownVaultPaths,
           getSettings: () => this.settings,
           openExternal: (url) => {
             window.open(url, "_blank", "noopener,noreferrer");
           },
+          promptAnnotation: async (quote) => window.prompt(`Annotation for:\n${quote}`, ""),
           showNotice: (message) => {
             new Notice(message);
           }

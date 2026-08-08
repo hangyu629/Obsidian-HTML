@@ -1,4 +1,5 @@
 import type { CleanupRule } from "../cleanup/types";
+import type { HtmlAnnotation } from "../annotations/types";
 
 export type DiagnosticLevel = "info" | "warning" | "error";
 
@@ -16,6 +17,7 @@ export interface PreviewDiagnostic {
 export interface BuildPreviewInput {
   allowScripts: boolean;
   cleanupRules: readonly CleanupRule[];
+  annotations?: readonly HtmlAnnotation[];
   knownVaultPaths: ReadonlySet<string>;
   renderId: string;
   resourceUrl: string;

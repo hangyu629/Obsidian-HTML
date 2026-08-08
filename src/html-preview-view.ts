@@ -1,5 +1,9 @@
 import { FileView, TFile, WorkspaceLeaf } from "obsidian";
 
+import { AnnotationsModal } from "./annotations/annotations-modal";
+import type { HtmlAnnotationStore } from "./annotations/annotation-store";
+import type { HtmlAnnotation } from "./annotations/types";
+import { ANNOTATION_MODE_MESSAGE_TYPE, ANNOTATION_SELECTED_MESSAGE_TYPE } from "./annotations/runtime";
 import { DiagnosticsModal, type DisplayDiagnostic } from "./diagnostics-modal";
 import { CleanupRulesModal } from "./cleanup/rules-modal";
 import type { CleanupRuleStore } from "./cleanup/rule-store";
@@ -28,6 +32,7 @@ const SCRIPT_FREE_SANDBOX_FLAGS =
   "allow-forms allow-modals allow-popups allow-downloads";
 
 export interface HtmlPreviewEnvironment {
+  annotationStore: Pick<HtmlAnnotationStore, "addFileAnnotation" | "load" | "removeAnnotation">;
   cleanupStore: Pick<
     CleanupRuleStore,
     | "addFileRule"
@@ -37,11 +42,13 @@ export interface HtmlPreviewEnvironment {
     | "resetFileRules"
   >;
   coordinator: PreviewCoordinator;
+  createAnnotationId?: () => string;
   createRenderId?: () => string;
   createRuleId?: () => string;
   getKnownVaultPaths(): ReadonlySet<string>;
   getSettings(): Pick<HtmlPreviewSettings, "allowScripts">;
   openExternal(url: string): void;
+  promptAnnotation(quote: string): Promise<string | null>;
   showNotice(message: string): void;
 }
 
@@ -99,6 +106,7 @@ function parseCleanupModeState(value: unknown): boolean | null {
 
 export class HtmlPreviewView extends FileView {
   private activeRenderId = "";
+  private activeAnnotations: HtmlAnnotation[] = [];
   private activeRules: CleanupRule[] = [];
   private cleanupAction: HTMLElement | null = null;
   private cleanupMode = false;
@@ -130,6 +138,12 @@ export class HtmlPreviewView extends FileView {
     this.contentEl.classList.add("html-preview-view");
     this.addAction("rotate-cw", "Reload preview", () => {
       void this.reload();
+    });
+    this.addAction("message-square-plus", "Add annotation", () => {
+      this.requestAnnotationSelection();
+    });
+    this.addAction("messages-square", "Manage annotations", () => {
+      this.openAnnotationManager();
     });
     this.cleanupAction = this.addAction("eraser", "Clean up page", () => {
       this.toggleCleanupMode();
@@ -168,6 +182,7 @@ export class HtmlPreviewView extends FileView {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.activeRenderId = "";
+    this.activeAnnotations = [];
     this.activeRules = [];
     this.unmatchedRuleIds.clear();
     this.undoStack = [];
@@ -194,6 +209,7 @@ export class HtmlPreviewView extends FileView {
     this.unsubscribe?.();
     this.unsubscribe = null;
     this.activeRenderId = "";
+    this.activeAnnotations = [];
     this.activeRules = [];
     this.unmatchedRuleIds.clear();
     this.undoStack = [];
@@ -231,9 +247,10 @@ export class HtmlPreviewView extends FileView {
     const allowScripts = this.environment.getSettings().allowScripts;
 
     try {
-      const [source, cleanupRules] = await Promise.all([
+      const [source, cleanupRules, annotations] = await Promise.all([
         this.app.vault.cachedRead(file),
-        this.loadCleanupRules(file.path, allowScripts)
+        this.loadCleanupRules(file.path, allowScripts),
+        this.environment.annotationStore.load(file.path)
       ]);
       if (token !== this.renderToken || this.file?.path !== file.path) {
         return;
@@ -242,6 +259,7 @@ export class HtmlPreviewView extends FileView {
       const result = buildPreviewDocument({
         allowScripts,
         cleanupRules,
+        annotations,
         knownVaultPaths: this.environment.getKnownVaultPaths(),
         renderId,
         resourceUrl: this.app.vault.getResourcePath(file),
@@ -262,6 +280,7 @@ export class HtmlPreviewView extends FileView {
       frame.srcdoc = result.html;
       this.frame = frame;
       this.activeRenderId = renderId;
+      this.activeAnnotations = annotations;
       this.activeRules = cleanupRules;
       this.unmatchedRuleIds.clear();
       this.diagnostics = result.diagnostics;
@@ -286,6 +305,7 @@ export class HtmlPreviewView extends FileView {
       ];
       this.frame = null;
       this.activeRenderId = "";
+      this.activeAnnotations = [];
       this.activeRules = [];
       this.showState("Unable to preview this HTML file");
     }
@@ -308,6 +328,12 @@ export class HtmlPreviewView extends FileView {
         return;
       }
       await this.saveCleanupRule(candidate, this.file.path, this.activeRenderId);
+      return;
+    }
+
+    const annotation = parseAnnotationSelection(event.data);
+    if (annotation) {
+      await this.saveAnnotation(annotation, this.file.path);
       return;
     }
 
@@ -350,6 +376,50 @@ export class HtmlPreviewView extends FileView {
     if (decision.kind === "blocked") {
       this.diagnostics.push({ level: "warning", message: decision.reason });
     }
+  }
+
+  private requestAnnotationSelection(): void {
+    if (!this.environment.getSettings().allowScripts) {
+      this.environment.showNotice(
+        "Enable page JavaScript in HTML Preview settings to use annotations."
+      );
+      return;
+    }
+    if (!this.frame?.contentWindow || !this.file) return;
+    this.frame.contentWindow.postMessage(
+      { enabled: true, renderId: this.activeRenderId, type: ANNOTATION_MODE_MESSAGE_TYPE },
+      "*"
+    );
+    this.environment.showNotice("Select text in the page to add an annotation.");
+  }
+
+  private async saveAnnotation(
+    annotation: { quote: string; target: HtmlAnnotation["target"] },
+    sourcePath: string
+  ): Promise<void> {
+    const comment = await this.environment.promptAnnotation(annotation.quote);
+    if (!comment || comment.trim().length === 0) return;
+    await this.environment.annotationStore.addFileAnnotation(sourcePath, {
+      comment: comment.trim(),
+      id: this.environment.createAnnotationId?.() ?? createRenderId(),
+      quote: annotation.quote,
+      sourcePath,
+      target: annotation.target
+    });
+    this.environment.showNotice("Annotation added.");
+    await this.reload();
+  }
+
+  private openAnnotationManager(): void {
+    if (!this.file) return;
+    new AnnotationsModal(this.app, {
+      annotations: this.activeAnnotations,
+      onDelete: async (annotation) => {
+        await this.environment.annotationStore.removeAnnotation(annotation);
+        await this.reload();
+      },
+      onError: (message) => this.environment.showNotice(message)
+    }).open();
   }
 
   private async loadCleanupRules(
@@ -505,4 +575,35 @@ export class HtmlPreviewView extends FileView {
     this.contentEl.replaceChildren(state);
     this.frame = null;
   }
+}
+
+function parseAnnotationSelection(
+  value: unknown
+): { quote: string; target: HtmlAnnotation["target"] } | null {
+  if (!isRecord(value) || value.type !== ANNOTATION_SELECTED_MESSAGE_TYPE || !isRecord(value.annotation)) {
+    return null;
+  }
+  const annotation = value.annotation as Record<string, unknown>;
+  const target = annotation.target;
+  if (
+    typeof annotation.quote !== "string" ||
+    !isRecord(target) ||
+    typeof target.start !== "number" ||
+    typeof target.end !== "number" ||
+    typeof target.exact !== "string" ||
+    typeof target.prefix !== "string" ||
+    typeof target.suffix !== "string"
+  ) {
+    return null;
+  }
+  return {
+    quote: annotation.quote,
+    target: {
+      end: target.end,
+      exact: target.exact,
+      prefix: target.prefix,
+      start: target.start,
+      suffix: target.suffix
+    }
+  };
 }

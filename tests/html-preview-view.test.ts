@@ -73,6 +73,11 @@ function createHarness(
   allowScripts = true,
   cleanupStore = createCleanupStore()
 ) {
+  const annotationStore = {
+    addFileAnnotation: vi.fn(async () => undefined),
+    load: vi.fn(async () => []),
+    removeAnnotation: vi.fn(async () => undefined)
+  };
   const openLinkText = vi.fn(async () => undefined);
   const app = {
     vault: {
@@ -85,6 +90,7 @@ function createHarness(
   const openExternal = vi.fn();
   const showNotice = vi.fn();
   const view = new HtmlPreviewView(createLeaf(app), {
+    annotationStore,
     cleanupStore,
     coordinator,
     createRenderId: () => "render-test",
@@ -92,6 +98,7 @@ function createHarness(
     getKnownVaultPaths: () => new Set(["pages/guide.html"]),
     getSettings: () => ({ allowScripts }),
     openExternal,
+    promptAnnotation: vi.fn(async () => null),
     showNotice
   });
   document.body.append(view.containerEl);
@@ -99,6 +106,7 @@ function createHarness(
 
   return {
     app,
+    annotationStore,
     cleanupStore,
     coordinator,
     openExternal,

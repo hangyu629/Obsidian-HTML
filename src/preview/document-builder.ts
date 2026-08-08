@@ -123,11 +123,12 @@ function installBase(document: Document, href: string, diagnostics: PreviewDiagn
 function installBridge(
   document: Document,
   renderId: string,
-  cleanupRules: BuildPreviewInput["cleanupRules"]
+  cleanupRules: BuildPreviewInput["cleanupRules"],
+  annotations: BuildPreviewInput["annotations"]
 ): void {
   const script = document.createElement("script");
   script.dataset.htmlPreviewBridge = "true";
-  script.textContent = createBridgeScript(renderId, cleanupRules);
+  script.textContent = createBridgeScript(renderId, cleanupRules, annotations ?? []);
   document.head.insertBefore(script, document.head.children[1] ?? null);
 }
 
@@ -152,7 +153,7 @@ export function buildPreviewDocument(input: BuildPreviewInput): BuildPreviewResu
 
   const dependencies = collectDependencies(document, input, diagnostics);
   installBase(document, getBaseUrl(input.resourceUrl, diagnostics), diagnostics);
-  installBridge(document, input.renderId, input.cleanupRules);
+  installBridge(document, input.renderId, input.cleanupRules, input.annotations ?? []);
 
   return {
     dependencies,
