@@ -1,0 +1,10 @@
+{
+  "id": "html-preview",
+  "name": "HTML Preview",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Preview HTML and HTM files stored in your vault.",
+  "author": "Hangyu",
+  "isDesktopOnly": false
+}
+
