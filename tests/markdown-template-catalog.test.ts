@@ -63,10 +63,45 @@ describe("MarkdownTemplateCatalog", () => {
       },
       {
         defaultTheme: "light",
+        id: "magazine-research",
+        name: "Magazine Research",
+        themeIds: ["light", "dark"]
+      },
+      {
+        defaultTheme: "light",
         id: "editorial",
         name: "Editorial",
         themeIds: ["light"]
       }
+    ]);
+  });
+
+  it("loads built-in templates before matching Vault packages", async () => {
+    const adapter = new MemoryTemplateAdapter();
+    seedEditorial(adapter);
+    const root = markdownTemplatePath("magazine-research");
+    adapter.files.set(
+      `${root}/template.json`,
+      JSON.stringify({
+        defaultTheme: "light",
+        id: "magazine-research",
+        name: "Vault collision",
+        themes: [{ id: "light", name: "Light", stylesheet: "themes/light.css" }],
+        version: 1
+      })
+    );
+    adapter.files.set(`${root}/layout.html`, `<main data-slot="content"></main>`);
+    adapter.files.set(`${root}/styles.css`, ".page {}");
+    adapter.files.set(`${root}/themes/light.css`, ":root {}");
+    const catalog = new MarkdownTemplateCatalog(adapter);
+
+    await expect(catalog.load("magazine-research")).resolves.toMatchObject({
+      manifest: { id: "magazine-research", name: "Magazine Research" }
+    });
+    expect((await catalog.list()).map((template) => template.id)).toEqual([
+      "book-editorial",
+      "magazine-research",
+      "editorial"
     ]);
   });
 
@@ -104,7 +139,8 @@ describe("MarkdownTemplateCatalog", () => {
       manifest: { id: BUILT_IN_TEMPLATE_ID }
     });
     expect((await catalog.list()).map((item) => item.id)).toEqual([
-      BUILT_IN_TEMPLATE_ID
+      BUILT_IN_TEMPLATE_ID,
+      "magazine-research"
     ]);
   });
 });

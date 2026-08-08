@@ -42,7 +42,7 @@ Restart Obsidian, open **Settings -> Community plugins**, and enable **HTML Prev
 
 Enhanced reading keeps the normal Markdown editor and source file intact. Use the **Enhanced reading** command or the book action on a Markdown view to open a rendered page. The renderer is Obsidian's native `MarkdownRenderer`, so core headings, lists, tables, tasks, callouts, code, math, links, embeds, Properties, and footnotes retain Obsidian behavior. Use **Open native Markdown** to return to the normal view.
 
-The built-in **Book Editorial** template is the default. It uses a book-like single-column layout, an editorial cover, paper-toned light and dark themes, and dedicated presentation for Properties, the table of contents, quotes, Callouts, tables, code, task lists, math, embeds, and footnotes.
+The built-in **Book Editorial** template is the default. It uses a book-like single-column layout, an editorial cover, paper-toned light and dark themes, and dedicated presentation for Properties, the table of contents, quotes, Callouts, tables, code, task lists, math, embeds, and footnotes. **Magazine Research** is also available as a built-in option: it uses a navy editorial masthead, coral and sage accents, a combined Contents/Properties band, and a wide research-report reading column.
 
 Templates are Vault-backed packages under:
 
@@ -57,7 +57,7 @@ Templates are Vault-backed packages under:
 
 Layouts may define one each of `data-slot="title"`, `properties`, `toc`, and the required `data-slot="content"`. CSS is scoped to the enhanced view root. Template packages contain HTML, CSS, metadata, themes, and local assets only; scripts, forms, frames, external resources, and event-handler attributes are rejected.
 
-Automatic enhanced reading is enabled in settings and applies only when a note matches a rule. A frontmatter rule has highest priority:
+Automatic enhanced reading is enabled in settings and applies only when a note matches a rule. In **Settings → Folder template mappings**, add a Vault folder and choose its template and theme from the selectors; nested notes inherit the mapping, with the most specific folder winning. A frontmatter rule has highest priority:
 
 ```yaml
 html-preview:
@@ -123,8 +123,10 @@ Fixtures for manual Vault smoke testing are in `tests/fixtures/`.
 
 清理功能依赖 **Allow page JavaScript**；关闭此设置后不会应用规则，也不能选择元素。跨域 iframe、canvas、视频或图片内部的内容不能单独选择，只能隐藏它们的外层元素。
 
-增强 Markdown 阅读不会改变 `.md` 源文件。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 Vault 的 `.html-preview/markdown-templates/` 中保存完整布局模板。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
+增强 Markdown 阅读不会改变 `.md` 源文件。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 **设置 → Folder template mappings** 中按 Vault 文件夹选择模板和主题；子文件夹继承规则，最具体的文件夹优先。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
 
 内置默认模板为 **Book Editorial**：它采用书籍式单栏、封面标题区和浅色/深色纸张主题，并专门处理 Properties、目录、引用、Callout、表格、代码、任务、数学公式、嵌入与脚注。
+
+另一个内置模板为 **Magazine Research**：它采用深海军蓝刊头、珊瑚红与鼠尾草绿配色、目录与 Properties 信息带，以及适合长文研究报告的宽单栏正文。可以在增强阅读模板选择器中临时切换，也可以在文件夹映射中设置为自动应用。
 
 首次使用前请阅读上面的 **Security** 与 **Compatibility Limits**。不信任的 HTML 可能通过脚本发起网络请求，可在插件设置中关闭 **Allow page JavaScript**。

@@ -55,6 +55,10 @@ describe("Markdown plugin integration", () => {
     );
     expect(plugin.markdownTemplateCatalog).toBeDefined();
     expect(plugin.settings.defaultTemplateId).toBe("book-editorial");
+    expect(plugin.listMarkdownTemplates().map((template) => template.id)).toEqual([
+      "book-editorial",
+      "magazine-research"
+    ]);
     expect(MARKDOWN_TEMPLATE_ROOT).toBe(".html-preview/markdown-templates");
   });
 });

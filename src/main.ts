@@ -20,6 +20,7 @@ import {
   MarkdownTemplateCatalog,
   type MarkdownTemplateCatalogAdapter
 } from "./markdown/templates/catalog";
+import type { MarkdownTemplateSummary } from "./markdown/templates/types";
 import { resolveMarkdownTemplate } from "./markdown/rules";
 import { MarkdownTemplateModal } from "./markdown/template-modal";
 
@@ -29,6 +30,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   settings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   markdownTemplateCatalog!: MarkdownTemplateCatalog;
   markdownTemplateSettings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
+  private markdownTemplates: MarkdownTemplateSummary[] = [];
   private readonly knownVaultPaths = new Set<string>();
   private markdownTemplateIds = new Set(["book-editorial"]);
   private readonly enhancedLeaves = new WeakSet<object>();
@@ -46,9 +48,8 @@ export default class HtmlPreviewPlugin extends Plugin {
     this.markdownTemplateCatalog = new MarkdownTemplateCatalog(
       this.app.vault.adapter as MarkdownTemplateCatalogAdapter
     );
-    this.markdownTemplateIds = new Set(
-      (await this.markdownTemplateCatalog.list()).map((template) => template.id)
-    );
+    this.markdownTemplates = await this.markdownTemplateCatalog.list();
+    this.markdownTemplateIds = new Set(this.markdownTemplates.map((template) => template.id));
     this.markdownTemplateSettings = this.settings;
 
     this.registerView(
@@ -173,6 +174,10 @@ export default class HtmlPreviewPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  listMarkdownTemplates(): readonly MarkdownTemplateSummary[] {
+    return this.markdownTemplates;
   }
 
   refreshOpenPreviews(): void {

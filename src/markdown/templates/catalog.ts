@@ -1,6 +1,7 @@
 import {
   BUILT_IN_TEMPLATE,
-  BUILT_IN_TEMPLATE_ID
+  BUILT_IN_TEMPLATES,
+  builtInTemplateFor
 } from "./built-in";
 import { parseTemplateManifest, validateTemplatePackage } from "./validation";
 import type {
@@ -33,14 +34,12 @@ export class MarkdownTemplateCatalog {
   constructor(private readonly adapter: MarkdownTemplateCatalogAdapter) {}
 
   async list(): Promise<MarkdownTemplateSummary[]> {
-    const summaries: MarkdownTemplateSummary[] = [
-      {
-        defaultTheme: BUILT_IN_TEMPLATE.manifest.defaultTheme,
-        id: BUILT_IN_TEMPLATE_ID,
-        name: BUILT_IN_TEMPLATE.manifest.name,
-        themeIds: BUILT_IN_TEMPLATE.manifest.themes.map((theme) => theme.id)
-      }
-    ];
+    const summaries: MarkdownTemplateSummary[] = BUILT_IN_TEMPLATES.map((template) => ({
+      defaultTheme: template.manifest.defaultTheme,
+      id: template.manifest.id,
+      name: template.manifest.name,
+      themeIds: template.manifest.themes.map((theme) => theme.id)
+    }));
     const root = `${MARKDOWN_TEMPLATE_ROOT}/`;
     let listing: { files: string[]; folders: string[] };
     try {
@@ -52,6 +51,7 @@ export class MarkdownTemplateCatalog {
       .filter((folder) => folder.startsWith(root))
       .map((folder) => folder.slice(root.length).replace(/\/$/, ""))
       .filter(isTemplateId)
+      .filter((id) => !builtInTemplateFor(id))
       .filter((id, index, values) => values.indexOf(id) === index)
       .sort();
     for (const id of ids) {
@@ -70,9 +70,8 @@ export class MarkdownTemplateCatalog {
   }
 
   async load(templateId: string): Promise<MarkdownTemplatePackage> {
-    if (templateId === BUILT_IN_TEMPLATE_ID) {
-      return BUILT_IN_TEMPLATE;
-    }
+    const builtIn = builtInTemplateFor(templateId);
+    if (builtIn) return builtIn;
     if (!isTemplateId(templateId)) {
       return BUILT_IN_TEMPLATE;
     }

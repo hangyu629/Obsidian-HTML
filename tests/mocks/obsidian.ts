@@ -169,9 +169,11 @@ export class PluginSettingTab extends Component {
   containerEl = document.createElement("div");
 }
 export class Setting {
-  private readonly element: HTMLElement;
+  readonly element: HTMLElement;
+  readonly settingEl: HTMLElement;
   constructor(container: HTMLElement) {
     this.element = document.createElement("div");
+    this.settingEl = this.element;
     container.append(this.element);
   }
   setName(name: string): this {

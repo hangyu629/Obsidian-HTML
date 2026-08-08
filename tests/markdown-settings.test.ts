@@ -20,14 +20,65 @@ describe("Markdown enhanced reading settings", () => {
 
   it("renders controls for enhanced reading defaults", () => {
     const plugin = {
+      listMarkdownTemplates: vi.fn(() => []),
       settings: { ...DEFAULT_SETTINGS } as HtmlPreviewSettings,
       saveSettings: vi.fn(async () => undefined),
       refreshOpenPreviews: vi.fn()
-    } as never;
-    const tab = new HtmlPreviewSettingTab({} as never, plugin);
+    };
+    const tab = new HtmlPreviewSettingTab({} as never, plugin as never);
     tab.display();
     expect(tab.containerEl).toBeDefined();
     expect(tab.containerEl.textContent).toContain("Folder template mappings");
+  });
+
+  it("lets each folder mapping select a template and its theme", async () => {
+    const plugin = {
+      listMarkdownTemplates: vi.fn(() => [
+        {
+          defaultTheme: "light",
+          id: "book-editorial",
+          name: "Book Editorial",
+          themeIds: ["light", "dark"]
+        },
+        {
+          defaultTheme: "light",
+          id: "magazine-research",
+          name: "Magazine Research",
+          themeIds: ["light", "dark"]
+        }
+      ]),
+      settings: {
+        ...DEFAULT_SETTINGS,
+        folderMappings: [
+          { folder: "Books", templateId: "book-editorial", themeId: "dark" }
+        ]
+      } as HtmlPreviewSettings,
+      saveSettings: vi.fn(async () => undefined),
+      refreshOpenPreviews: vi.fn()
+    };
+    const tab = new HtmlPreviewSettingTab({} as never, plugin as never);
+
+    tab.display();
+
+    const templateSelect = tab.containerEl.querySelector<HTMLSelectElement>(
+      "select[data-folder-template]"
+    );
+    expect(templateSelect?.textContent).toContain("Magazine Research");
+    expect(
+      tab.containerEl.querySelector<HTMLSelectElement>("select[data-folder-theme]")?.value
+    ).toBe("dark");
+
+    (templateSelect as HTMLSelectElement).value = "magazine-research";
+    templateSelect?.dispatchEvent(new Event("change"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(plugin.settings.folderMappings[0]).toEqual({
+      folder: "Books",
+      templateId: "magazine-research",
+      themeId: "light"
+    });
+    expect(plugin.saveSettings).toHaveBeenCalled();
   });
 
   it("migrates the removed minimal template in stored settings", () => {

@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting } from "obsidian";
 
 import type HtmlPreviewPlugin from "./main";
 import type { FolderTemplateMapping, MarkdownTemplateSettings } from "./markdown/rules";
+import type { MarkdownTemplateSummary } from "./markdown/templates/types";
 
 export interface HtmlPreviewSettings extends MarkdownTemplateSettings {
   allowScripts: boolean;
@@ -116,6 +117,7 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
           })
       );
 
+    const templates = this.plugin.listMarkdownTemplates();
     new Setting(this.containerEl)
       .setName("Folder template mappings")
       .setDesc("The most specific matching folder wins when a note has no frontmatter override.")
@@ -146,25 +148,13 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
         );
         await this.plugin.saveSettings();
       };
-      new Setting(this.containerEl)
+      const row = new Setting(this.containerEl)
         .setName(`Folder mapping ${index + 1}`)
         .addText((text) =>
           text
             .setValue(mapping.folder)
             .setPlaceholder("Folder path")
             .onChange((value) => update({ folder: value.trim() }))
-        )
-        .addText((text) =>
-          text
-            .setValue(mapping.templateId)
-            .setPlaceholder("Template id")
-            .onChange((value) => update({ templateId: value.trim() }))
-        )
-        .addText((text) =>
-          text
-            .setValue(mapping.themeId ?? "")
-            .setPlaceholder("Theme id")
-            .onChange((value) => update({ themeId: value.trim() || undefined }))
         )
         .addExtraButton((button) =>
           button.setIcon("trash").setTooltip("Remove mapping").onClick(async () => {
@@ -175,6 +165,57 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
             this.display();
           })
         );
+      this.addFolderTemplateSelectors(row.settingEl, mapping, templates, update);
     });
+  }
+
+  private addFolderTemplateSelectors(
+    setting: HTMLElement,
+    mapping: FolderTemplateMapping,
+    templates: readonly MarkdownTemplateSummary[],
+    update: (changes: Partial<FolderTemplateMapping>) => Promise<void>
+  ): void {
+    if (templates.length === 0) {
+      const empty = document.createElement("span");
+      empty.textContent = "No Markdown templates available";
+      setting.append(empty);
+      return;
+    }
+    const fallbackTemplate = templates[0];
+    if (!fallbackTemplate) return;
+    const selectedTemplate =
+      templates.find((template) => template.id === mapping.templateId) ?? fallbackTemplate;
+    const templateSelect = document.createElement("select");
+    templateSelect.dataset.folderTemplate = "true";
+    for (const template of templates) {
+      const option = document.createElement("option");
+      option.value = template.id;
+      option.textContent = template.name;
+      templateSelect.append(option);
+    }
+    templateSelect.value = selectedTemplate.id;
+    templateSelect.addEventListener("change", () => {
+      const template = templates.find((item) => item.id === templateSelect.value);
+      if (!template) return;
+      void update({ templateId: template.id, themeId: template.defaultTheme }).then(() => {
+        this.display();
+      });
+    });
+
+    const themeSelect = document.createElement("select");
+    themeSelect.dataset.folderTheme = "true";
+    for (const themeId of selectedTemplate.themeIds) {
+      const option = document.createElement("option");
+      option.value = themeId;
+      option.textContent = themeId;
+      themeSelect.append(option);
+    }
+    themeSelect.value = selectedTemplate.themeIds.includes(mapping.themeId ?? "")
+      ? mapping.themeId ?? selectedTemplate.defaultTheme
+      : selectedTemplate.defaultTheme;
+    themeSelect.addEventListener("change", () => {
+      void update({ themeId: themeSelect.value });
+    });
+    setting.append(templateSelect, themeSelect);
   }
 }

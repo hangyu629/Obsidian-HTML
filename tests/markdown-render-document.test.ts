@@ -2,7 +2,10 @@ import { Component, MarkdownRenderer } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderEnhancedMarkdown } from "../src/markdown/render-document";
-import { BUILT_IN_TEMPLATE } from "../src/markdown/templates/built-in";
+import {
+  BUILT_IN_TEMPLATE,
+  builtInTemplateFor
+} from "../src/markdown/templates/built-in";
 import type { MarkdownTemplatePackage } from "../src/markdown/templates/types";
 
 function template(layout = BUILT_IN_TEMPLATE.layout): MarkdownTemplatePackage {
@@ -138,6 +141,37 @@ describe("renderEnhancedMarkdown", () => {
       ".book-editorial-content .footnotes"
     ]) {
       expect(BUILT_IN_TEMPLATE.styles).toContain(selector);
+    }
+  });
+
+  it("provides the magazine research layout, themes, and core Markdown styling contract", () => {
+    const template = builtInTemplateFor("magazine-research");
+
+    expect(template?.manifest).toMatchObject({
+      id: "magazine-research",
+      name: "Magazine Research",
+      themes: expect.arrayContaining([
+        expect.objectContaining({ id: "light" }),
+        expect.objectContaining({ id: "dark" })
+      ])
+    });
+    expect(template?.layout).toContain("magazine-research-masthead");
+    for (const slot of ["title", "properties", "toc", "content"]) {
+      expect(template?.layout).toContain(`data-slot=\"${slot}\"`);
+    }
+    for (const selector of [
+      ".magazine-research-content h1",
+      ".magazine-research-content blockquote",
+      ".magazine-research-content .callout",
+      ".magazine-research-content table",
+      ".magazine-research-content pre",
+      ".magazine-research-content .task-list-item-checkbox",
+      ".magazine-research-content .math-block",
+      ".magazine-research-content .internal-embed",
+      ".magazine-research-content .footnotes",
+      "@media (max-width: 700px)"
+    ]) {
+      expect(template?.styles).toContain(selector);
     }
   });
 });
