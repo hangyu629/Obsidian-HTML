@@ -45,7 +45,7 @@
 - [ ] **Step 2: Run RED.** `npm test -- tests/markdown-template-validation.test.ts`; expect import/module failures because the template contracts do not exist.
 - [ ] **Step 3: Implement bounded manifest/layout validation.** Parse layout with inert `DOMParser`, reject dangerous elements and attributes, require exactly one `data-slot="content"`, allow only documented slots, reject `http:`, `https:`, `//`, `data:` and absolute asset references, and normalize package-relative paths.
 - [ ] **Step 4: Write failing catalog tests.** Use an in-memory adapter to cover built-in fallback, package discovery under `.html-preview/markdown-templates/`, missing files, corrupt manifests, missing themes, and path traversal rejection.
-- [ ] **Step 5: Implement the Vault catalog.** Define a narrow adapter with `list`, `exists`, and `read`; discover only direct template directories, load manifest/layout/base CSS/themes/assets, and return the built-in minimal package for invalid or missing packages without mutating Vault data.
+- [ ] **Step 5: Implement the Vault catalog.** Define a narrow adapter with `list`, `exists`, and `read`; discover only direct template directories, load manifest/layout/base CSS/themes/assets, and return the built-in Book Editorial package for invalid or missing packages without mutating Vault data.
 - [ ] **Step 6: Run focused tests and typecheck.** `npm test -- tests/markdown-template-validation.test.ts tests/markdown-template-catalog.test.ts && npm run typecheck`.
 - [ ] **Step 7: Commit.** `git add src/markdown/templates tests/markdown-template-* tests/mocks/obsidian.ts && git commit -m "feat: validate Markdown template packages"`.
 
