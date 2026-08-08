@@ -1,6 +1,11 @@
 import { Notice, Plugin, TFile } from "obsidian";
 
 import { HtmlAnnotationStore } from "./annotations/annotation-store";
+import { AnnotationService } from "./annotations/annotation-service";
+import {
+  AnnotationSidebarView,
+  ANNOTATION_SIDEBAR_VIEW_TYPE
+} from "./annotations/sidebar-view";
 import { CleanupRuleStore } from "./cleanup/rule-store";
 import {
   HtmlPreviewView,
@@ -29,6 +34,7 @@ import { MarkdownTemplateModal } from "./markdown/template-modal";
 export default class HtmlPreviewPlugin extends Plugin {
   readonly coordinator = new PreviewCoordinator();
   annotationStore!: HtmlAnnotationStore;
+  annotationService!: AnnotationService;
   cleanupStore!: CleanupRuleStore;
   settings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   markdownTemplateCatalog!: MarkdownTemplateCatalog;
@@ -49,6 +55,7 @@ export default class HtmlPreviewPlugin extends Plugin {
       }
     );
     this.annotationStore = new HtmlAnnotationStore(this.app.vault.adapter as never);
+    this.annotationService = new AnnotationService(this.annotationStore);
 
     this.markdownTemplateCatalog = new MarkdownTemplateCatalog(
       this.app.vault.adapter as MarkdownTemplateCatalogAdapter
@@ -58,10 +65,23 @@ export default class HtmlPreviewPlugin extends Plugin {
     this.markdownTemplateSettings = this.settings;
 
     this.registerView(
+      ANNOTATION_SIDEBAR_VIEW_TYPE,
+      (leaf) =>
+        new AnnotationSidebarView(leaf, {
+          annotationService: this.annotationService,
+          focusAnnotation: (sourcePath, id) =>
+            this.focusAnnotation(sourcePath, id),
+          showNotice: (message) => new Notice(message)
+        })
+    );
+
+    this.registerView(
       ENHANCED_MARKDOWN_VIEW_TYPE,
       (leaf) =>
         new EnhancedMarkdownView(leaf, {
+          annotationService: this.annotationService,
           coordinator: this.coordinator,
+          createAnnotationId: () => createRenderId(),
           getFrontmatter: (file) =>
             this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {},
           loadTemplate: (templateId) => this.markdownTemplateCatalog.load(templateId),
@@ -84,7 +104,10 @@ export default class HtmlPreviewPlugin extends Plugin {
               this.markdownTemplateSettings,
               this.markdownTemplateIds,
               mode
-            )
+            ),
+          showNotice: (message) => {
+            new Notice(message);
+          }
         })
     );
 
@@ -92,7 +115,7 @@ export default class HtmlPreviewPlugin extends Plugin {
       HTML_PREVIEW_VIEW_TYPE,
       (leaf) =>
         new HtmlPreviewView(leaf, {
-          annotationStore: this.annotationStore,
+          annotationService: this.annotationService,
           cleanupStore: this.cleanupStore,
           coordinator: this.coordinator,
           createAnnotationId: () => createRenderId(),
@@ -101,7 +124,6 @@ export default class HtmlPreviewPlugin extends Plugin {
           openExternal: (url) => {
             window.open(url, "_blank", "noopener,noreferrer");
           },
-          promptAnnotation: async (quote) => window.prompt(`Annotation for:\n${quote}`, ""),
           showNotice: (message) => {
             new Notice(message);
           }
@@ -118,17 +140,26 @@ export default class HtmlPreviewPlugin extends Plugin {
         if (file instanceof TFile) void this.openEnhancedMarkdown(file.path, "manual");
       }
     });
+    this.addCommand({
+      id: "open-annotation-sidebar",
+      name: "Open annotation sidebar",
+      callback: () => {
+        void this.openAnnotationSidebar();
+      }
+    });
 
     if (typeof this.app.workspace.on === "function") {
       this.registerEvent(
         this.app.workspace.on("active-leaf-change", (leaf) => {
           this.installMarkdownAction(leaf);
           void this.maybeAutoOpen(leaf);
+          void this.updateAnnotationSidebars(leaf);
         })
       );
       this.registerEvent(
         this.app.workspace.on("file-open", () => {
           void this.maybeAutoOpen(this.app.workspace.activeLeaf);
+          void this.updateAnnotationSidebars(this.app.workspace.activeLeaf);
         })
       );
     }
@@ -205,6 +236,46 @@ export default class HtmlPreviewPlugin extends Plugin {
         this.coordinator.notify(file.path);
       }
     }
+  }
+
+  private async openAnnotationSidebar(): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(
+      ANNOTATION_SIDEBAR_VIEW_TYPE
+    )[0];
+    const leaf = existing ?? this.app.workspace.getRightLeaf(false);
+    if (!leaf) {
+      new Notice("无法打开注释侧栏。");
+      return;
+    }
+    if (!existing) {
+      await leaf.setViewState({ type: ANNOTATION_SIDEBAR_VIEW_TYPE, active: true });
+    }
+    await this.app.workspace.revealLeaf(leaf);
+    await this.updateAnnotationSidebars(this.app.workspace.activeLeaf);
+  }
+
+  private async updateAnnotationSidebars(activeLeaf: any): Promise<void> {
+    const file = activeLeaf?.view?.file;
+    const extension = file instanceof TFile ? file.extension.toLowerCase() : "";
+    const sourcePath = file instanceof TFile &&
+      (extension === "html" || extension === "htm" || extension === "md")
+      ? file.path
+      : null;
+    for (const leaf of this.app.workspace.getLeavesOfType?.(
+      ANNOTATION_SIDEBAR_VIEW_TYPE
+    ) ?? []) {
+      const view = leaf.view;
+      if (view instanceof AnnotationSidebarView) await view.setSource(sourcePath);
+    }
+  }
+
+  private async focusAnnotation(sourcePath: string, id: string): Promise<boolean> {
+    if (await this.annotationService.focus(sourcePath, id)) return true;
+    if (!sourcePath.toLowerCase().endsWith(".md")) return false;
+    const leaf = this.app.workspace.getMostRecentLeaf();
+    await this.openEnhancedMarkdown(sourcePath, "manual", leaf);
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    return this.annotationService.focus(sourcePath, id);
   }
 
   private rebuildPathIndex(): void {

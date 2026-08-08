@@ -2,6 +2,7 @@ import { TFile } from "obsidian";
 import { describe, expect, it, vi } from "vitest";
 
 import HtmlPreviewPlugin from "../src/main";
+import { ANNOTATION_SIDEBAR_VIEW_TYPE } from "../src/annotations/sidebar-view";
 import { ENHANCED_MARKDOWN_VIEW_TYPE } from "../src/markdown/enhanced-markdown-view";
 import { MARKDOWN_TEMPLATE_ROOT } from "../src/markdown/templates/catalog";
 
@@ -51,6 +52,14 @@ describe("Markdown plugin integration", () => {
       registeredViews: Map<string, unknown>;
     };
     expect(mockPlugin.registeredViews.has(ENHANCED_MARKDOWN_VIEW_TYPE)).toBe(true);
+    expect(mockPlugin.registeredViews.has(ANNOTATION_SIDEBAR_VIEW_TYPE)).toBe(true);
+    expect(
+      (plugin as unknown as { commands: Array<{ id?: string }> }).commands
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "open-annotation-sidebar" })
+      ])
+    );
     expect(mockPlugin.registeredExtensions).not.toContainEqual(
       expect.objectContaining({ extensions: expect.arrayContaining(["md"]) })
     );
