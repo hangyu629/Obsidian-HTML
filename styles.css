@@ -1,0 +1,47 @@
+.view-content.html-preview-view {
+  overflow: hidden;
+  padding: 0;
+}
+
+.html-preview-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: white;
+}
+
+.html-preview-state {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: var(--size-4-6);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.html-preview-state p {
+  margin: 0;
+}
+
+.html-preview-diagnostics {
+  display: grid;
+  gap: var(--size-4-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.html-preview-diagnostic {
+  padding: var(--size-4-3);
+  border-left: 3px solid var(--text-muted);
+  background: var(--background-secondary);
+}
+
+.html-preview-diagnostic.is-error {
+  border-left-color: var(--text-error);
+}
+
+.html-preview-diagnostic.is-warning {
+  border-left-color: var(--text-warning);
+}
