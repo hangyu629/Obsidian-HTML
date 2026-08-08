@@ -50,7 +50,10 @@ function harness(
   const annotationService = {
     focus: vi.fn(async () => false),
     load: vi.fn(async () => [...initialAnnotations]),
-    registerView: vi.fn(() => () => undefined),
+    registerView: vi.fn((_adapter: {
+      sourcePath: string;
+      focusAnnotation(id: string): Promise<boolean>;
+    }) => () => undefined),
     remove: vi.fn(async () => undefined),
     save: vi.fn(async () => undefined),
     subscribe: vi.fn(() => () => undefined)

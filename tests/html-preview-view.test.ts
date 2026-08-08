@@ -73,10 +73,13 @@ function createHarness(
   allowScripts = true,
   cleanupStore = createCleanupStore()
 ) {
-  const annotationStore = {
-    addFileAnnotation: vi.fn(async () => undefined),
+  const annotationService = {
+    focus: vi.fn(async () => false),
     load: vi.fn(async () => []),
-    removeAnnotation: vi.fn(async () => undefined)
+    registerView: vi.fn(() => () => undefined),
+    remove: vi.fn(async () => undefined),
+    save: vi.fn(async () => undefined),
+    subscribe: vi.fn(() => () => undefined)
   };
   const openLinkText = vi.fn(async () => undefined);
   const app = {
@@ -90,7 +93,7 @@ function createHarness(
   const openExternal = vi.fn();
   const showNotice = vi.fn();
   const view = new HtmlPreviewView(createLeaf(app), {
-    annotationStore,
+    annotationService,
     cleanupStore,
     coordinator,
     createRenderId: () => "render-test",
@@ -98,7 +101,6 @@ function createHarness(
     getKnownVaultPaths: () => new Set(["pages/guide.html"]),
     getSettings: () => ({ allowScripts }),
     openExternal,
-    promptAnnotation: vi.fn(async () => null),
     showNotice
   });
   document.body.append(view.containerEl);
@@ -106,7 +108,7 @@ function createHarness(
 
   return {
     app,
-    annotationStore,
+    annotationService,
     cleanupStore,
     coordinator,
     openExternal,
@@ -193,6 +195,16 @@ describe("HtmlPreviewView", () => {
       },
       "*"
     );
+  });
+
+  it("uses contextual annotations without fixed annotation actions", async () => {
+    const { annotationService, view } = createHarness();
+    await view.onLoadFile(createFile("pages/index.html"));
+
+    expect(viewActions(view).map((action) => action.title)).not.toEqual(
+      expect.arrayContaining(["Add annotation", "Manage annotations"])
+    );
+    expect(annotationService.registerView).toHaveBeenCalled();
   });
 
   it("reports that cleanup requires JavaScript when scripts are disabled", async () => {

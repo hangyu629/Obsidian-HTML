@@ -9,7 +9,8 @@ import {
   annotationFromMark,
   applyAnnotationHighlights,
   captureAnnotationSelection,
-  focusAnnotationMark
+  focusAnnotationMark,
+  type AnnotationSelection
 } from "../annotations/dom";
 import type { HtmlAnnotation } from "../annotations/types";
 import { createRenderId } from "../preview/bridge-script";

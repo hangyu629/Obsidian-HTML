@@ -1,6 +1,12 @@
 import { TFile, WorkspaceLeaf } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  ANNOTATION_DELETE_MESSAGE_TYPE,
+  ANNOTATION_RESULT_MESSAGE_TYPE,
+  ANNOTATION_SAVE_MESSAGE_TYPE
+} from "../src/annotations/runtime";
+import type { HtmlAnnotation } from "../src/annotations/types";
 import { HtmlPreviewView } from "../src/html-preview-view";
 import { PreviewCoordinator } from "../src/preview/preview-coordinator";
 import { validRule } from "./fixtures/cleanup-rules";
@@ -19,16 +25,28 @@ function createFile(path: string): TFile {
 }
 
 function createLeaf(app: unknown): WorkspaceLeaf {
-  const leaf = Object.create(WorkspaceLeaf.prototype) as WorkspaceLeaf;
-  Object.assign(leaf, { app });
-  return leaf;
+  return Object.assign(Object.create(WorkspaceLeaf.prototype), { app });
 }
 
-function createHarness() {
-  const annotationStore = {
-    addFileAnnotation: vi.fn(async () => undefined),
-    load: vi.fn(async () => []),
-    removeAnnotation: vi.fn(async () => undefined)
+function existingAnnotation(): HtmlAnnotation {
+  return {
+    color: "yellow",
+    comment: "existing",
+    id: "22222222222222222222222222222222",
+    quote: "gamma",
+    sourcePath: "pages/index.html",
+    target: { end: 16, exact: "gamma", prefix: "Alpha beta ", start: 11, suffix: "" }
+  };
+}
+
+function createHarness(initial: readonly HtmlAnnotation[] = []) {
+  const annotationService = {
+    focus: vi.fn(async () => false),
+    load: vi.fn(async () => [...initial]),
+    registerView: vi.fn(() => () => undefined),
+    remove: vi.fn(async () => undefined),
+    save: vi.fn(async () => undefined),
+    subscribe: vi.fn(() => () => undefined)
   };
   const app = {
     vault: {
@@ -37,14 +55,17 @@ function createHarness() {
     },
     workspace: { openLinkText: vi.fn(async () => undefined) }
   };
-  const promptAnnotation = vi.fn(async () => "important sentence");
   const showNotice = vi.fn();
   const view = new HtmlPreviewView(createLeaf(app), {
-    annotationStore,
+    annotationService,
     cleanupStore: {
       addFileRule: vi.fn(async () => undefined),
       loadEffective: vi.fn(async () => []),
-      promoteToFolder: vi.fn(async () => ({ ...validRule, scope: "folder" as const, sourcePath: "." })),
+      promoteToFolder: vi.fn(async () => ({
+        ...validRule,
+        scope: "folder" as const,
+        sourcePath: "."
+      })),
       removeRule: vi.fn(async () => undefined),
       resetFileRules: vi.fn(async () => undefined)
     },
@@ -55,12 +76,11 @@ function createHarness() {
     getKnownVaultPaths: () => new Set(),
     getSettings: () => ({ allowScripts: true }),
     openExternal: vi.fn(),
-    promptAnnotation,
     showNotice
   });
   document.body.append(view.containerEl);
   view.onload();
-  return { annotationStore, promptAnnotation, showNotice, view };
+  return { annotationService, showNotice, view };
 }
 
 describe("HtmlPreviewView annotations", () => {
@@ -68,15 +88,28 @@ describe("HtmlPreviewView annotations", () => {
     document.body.replaceChildren();
   });
 
-  it("persists an annotation selection from the preview iframe", async () => {
-    const { annotationStore, promptAnnotation, showNotice, view } = createHarness();
+  it("keeps text selectable and includes the contextual runtime", async () => {
+    const { view } = createHarness();
+    await view.onLoadFile(createFile("pages/index.html"));
+    const srcdoc = view.contentEl.querySelector("iframe")?.srcdoc ?? "";
+
+    expect(srcdoc).toContain("user-select: text !important");
+    expect(srcdoc).toContain("annotation-selection-toolbar");
+    expect(srcdoc).toContain("annotation-editor");
+  });
+
+  it("persists a validated save message and responds to the iframe", async () => {
+    const { annotationService, showNotice, view } = createHarness();
     await view.onLoadFile(createFile("pages/index.html"));
     const iframe = view.contentEl.querySelector("iframe")!;
+    const postMessage = vi.spyOn(iframe.contentWindow!, "postMessage");
 
     window.dispatchEvent(
       new MessageEvent("message", {
         data: {
           annotation: {
+            color: "blue",
+            comment: "important sentence",
             quote: "Alpha beta",
             target: {
               end: 10,
@@ -87,24 +120,74 @@ describe("HtmlPreviewView annotations", () => {
             }
           },
           renderId: "render-test",
-          type: "obsidian-html-preview:annotation-selected"
+          requestId: "save-1",
+          type: ANNOTATION_SAVE_MESSAGE_TYPE
         },
         source: iframe.contentWindow
       })
     );
 
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(promptAnnotation).toHaveBeenCalledWith("Alpha beta");
-    expect(annotationStore.addFileAnnotation).toHaveBeenCalledWith(
-      "pages/index.html",
+    await vi.waitFor(() => {
+      expect(annotationService.save).toHaveBeenCalledWith(
+        "pages/index.html",
+        expect.objectContaining({
+          color: "blue",
+          comment: "important sentence",
+          id: "11111111111111111111111111111111",
+          quote: "Alpha beta"
+        })
+      );
+    });
+    expect(postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        comment: "important sentence",
-        id: "11111111111111111111111111111111",
-        quote: "Alpha beta"
-      })
+        annotation: expect.objectContaining({ id: "11111111111111111111111111111111" }),
+        ok: true,
+        renderId: "render-test",
+        requestId: "save-1",
+        type: ANNOTATION_RESULT_MESSAGE_TYPE
+      }),
+      "*"
     );
     expect(showNotice).toHaveBeenCalledWith("Annotation added.");
+  });
+
+  it("deletes an existing annotation and rejects unknown colors", async () => {
+    const existing = existingAnnotation();
+    const { annotationService, view } = createHarness([existing]);
+    await view.onLoadFile(createFile("pages/index.html"));
+    const iframe = view.contentEl.querySelector("iframe")!;
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          annotationId: existing.id,
+          renderId: "render-test",
+          requestId: "delete-1",
+          type: ANNOTATION_DELETE_MESSAGE_TYPE
+        },
+        source: iframe.contentWindow
+      })
+    );
+    await vi.waitFor(() => expect(annotationService.remove).toHaveBeenCalledWith(existing));
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          annotation: {
+            color: "orange",
+            comment: "invalid",
+            quote: "Alpha",
+            target: { end: 5, exact: "Alpha", prefix: "", start: 0, suffix: " beta" }
+          },
+          renderId: "render-test",
+          requestId: "save-invalid",
+          type: ANNOTATION_SAVE_MESSAGE_TYPE
+        },
+        source: iframe.contentWindow
+      })
+    );
+    await Promise.resolve();
+
+    expect(annotationService.save).not.toHaveBeenCalled();
   });
 });

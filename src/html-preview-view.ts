@@ -1,9 +1,18 @@
 import { FileView, TFile, WorkspaceLeaf } from "obsidian";
 
-import { AnnotationsModal } from "./annotations/annotations-modal";
-import type { HtmlAnnotationStore } from "./annotations/annotation-store";
-import type { HtmlAnnotation } from "./annotations/types";
-import { ANNOTATION_MODE_MESSAGE_TYPE, ANNOTATION_SELECTED_MESSAGE_TYPE } from "./annotations/runtime";
+import type { AnnotationService } from "./annotations/annotation-service";
+import {
+  ANNOTATION_DELETE_MESSAGE_TYPE,
+  ANNOTATION_FOCUS_MESSAGE_TYPE,
+  ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE,
+  ANNOTATION_RESULT_MESSAGE_TYPE,
+  ANNOTATION_SAVE_MESSAGE_TYPE
+} from "./annotations/runtime";
+import {
+  annotationColor,
+  type AnnotationColor,
+  type HtmlAnnotation
+} from "./annotations/types";
 import { DiagnosticsModal, type DisplayDiagnostic } from "./diagnostics-modal";
 import { CleanupRulesModal } from "./cleanup/rules-modal";
 import type { CleanupRuleStore } from "./cleanup/rule-store";
@@ -32,7 +41,10 @@ const SCRIPT_FREE_SANDBOX_FLAGS =
   "allow-forms allow-modals allow-popups allow-downloads";
 
 export interface HtmlPreviewEnvironment {
-  annotationStore: Pick<HtmlAnnotationStore, "addFileAnnotation" | "load" | "removeAnnotation">;
+  annotationService: Pick<
+    AnnotationService,
+    "load" | "registerView" | "remove" | "save" | "subscribe"
+  >;
   cleanupStore: Pick<
     CleanupRuleStore,
     | "addFileRule"
@@ -48,8 +60,23 @@ export interface HtmlPreviewEnvironment {
   getKnownVaultPaths(): ReadonlySet<string>;
   getSettings(): Pick<HtmlPreviewSettings, "allowScripts">;
   openExternal(url: string): void;
-  promptAnnotation(quote: string): Promise<string | null>;
   showNotice(message: string): void;
+}
+
+interface AnnotationSaveMessage {
+  annotation: {
+    color: AnnotationColor;
+    comment: string;
+    id?: string;
+    quote: string;
+    target: HtmlAnnotation["target"];
+  };
+  requestId: string;
+}
+
+interface AnnotationDeleteMessage {
+  annotationId: string;
+  requestId: string;
 }
 
 let nextViewId = 0;
@@ -107,12 +134,19 @@ function parseCleanupModeState(value: unknown): boolean | null {
 export class HtmlPreviewView extends FileView {
   private activeRenderId = "";
   private activeAnnotations: HtmlAnnotation[] = [];
+  private annotationSubscription: (() => void) | null = null;
+  private annotationViewRegistration: (() => void) | null = null;
   private activeRules: CleanupRule[] = [];
   private cleanupAction: HTMLElement | null = null;
   private cleanupMode = false;
   private diagnostics: DisplayDiagnostic[] = [];
   private frame: HTMLIFrameElement | null = null;
   private readonly viewId = `html-preview-${++nextViewId}`;
+  private focusSequence = 0;
+  private readonly pendingFocus = new Map<
+    string,
+    { resolve(found: boolean): void; timeout: number }
+  >();
   private renderToken = 0;
   private undoStack: CleanupRule[] = [];
   private unmatchedRuleIds = new Set<string>();
@@ -138,12 +172,6 @@ export class HtmlPreviewView extends FileView {
     this.contentEl.classList.add("html-preview-view");
     this.addAction("rotate-cw", "Reload preview", () => {
       void this.reload();
-    });
-    this.addAction("message-square-plus", "Add annotation", () => {
-      this.requestAnnotationSelection();
-    });
-    this.addAction("messages-square", "Manage annotations", () => {
-      this.openAnnotationManager();
     });
     this.cleanupAction = this.addAction("eraser", "Clean up page", () => {
       this.toggleCleanupMode();
@@ -181,6 +209,11 @@ export class HtmlPreviewView extends FileView {
     this.renderToken += 1;
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.annotationSubscription?.();
+    this.annotationSubscription = null;
+    this.annotationViewRegistration?.();
+    this.annotationViewRegistration = null;
+    this.resolvePendingFocus(false);
     this.activeRenderId = "";
     this.activeAnnotations = [];
     this.activeRules = [];
@@ -208,6 +241,11 @@ export class HtmlPreviewView extends FileView {
     this.renderToken += 1;
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.annotationSubscription?.();
+    this.annotationSubscription = null;
+    this.annotationViewRegistration?.();
+    this.annotationViewRegistration = null;
+    this.resolvePendingFocus(false);
     this.activeRenderId = "";
     this.activeAnnotations = [];
     this.activeRules = [];
@@ -225,6 +263,8 @@ export class HtmlPreviewView extends FileView {
 
   private subscribe(sourcePath: string): void {
     this.unsubscribe?.();
+    this.annotationSubscription?.();
+    this.annotationViewRegistration?.();
     this.unsubscribe = this.environment.coordinator.subscribe(
       this.viewId,
       sourcePath,
@@ -233,6 +273,16 @@ export class HtmlPreviewView extends FileView {
         void this.render();
       }
     );
+    this.annotationSubscription = this.environment.annotationService.subscribe(
+      sourcePath,
+      () => {
+        void this.render();
+      }
+    );
+    this.annotationViewRegistration = this.environment.annotationService.registerView({
+      sourcePath,
+      focusAnnotation: (id) => this.focusAnnotation(id)
+    });
   }
 
   private async render(): Promise<void> {
@@ -250,7 +300,7 @@ export class HtmlPreviewView extends FileView {
       const [source, cleanupRules, annotations] = await Promise.all([
         this.app.vault.cachedRead(file),
         this.loadCleanupRules(file.path, allowScripts),
-        this.environment.annotationStore.load(file.path)
+        this.environment.annotationService.load(file.path)
       ]);
       if (token !== this.renderToken || this.file?.path !== file.path) {
         return;
@@ -331,9 +381,26 @@ export class HtmlPreviewView extends FileView {
       return;
     }
 
-    const annotation = parseAnnotationSelection(event.data);
-    if (annotation) {
-      await this.saveAnnotation(annotation, this.file.path);
+    const annotationSave = parseAnnotationSave(event.data);
+    if (annotationSave) {
+      await this.saveAnnotation(annotationSave, this.file.path);
+      return;
+    }
+
+    const annotationDelete = parseAnnotationDelete(event.data);
+    if (annotationDelete) {
+      await this.deleteAnnotation(annotationDelete);
+      return;
+    }
+
+    const focusResult = parseAnnotationFocusResult(event.data);
+    if (focusResult) {
+      const pending = this.pendingFocus.get(focusResult.requestId);
+      if (pending) {
+        window.clearTimeout(pending.timeout);
+        this.pendingFocus.delete(focusResult.requestId);
+        pending.resolve(focusResult.found);
+      }
       return;
     }
 
@@ -378,48 +445,108 @@ export class HtmlPreviewView extends FileView {
     }
   }
 
-  private requestAnnotationSelection(): void {
-    if (!this.environment.getSettings().allowScripts) {
-      this.environment.showNotice(
-        "Enable page JavaScript in HTML Preview settings to use annotations."
-      );
-      return;
-    }
-    if (!this.frame?.contentWindow || !this.file) return;
-    this.frame.contentWindow.postMessage(
-      { enabled: true, renderId: this.activeRenderId, type: ANNOTATION_MODE_MESSAGE_TYPE },
-      "*"
-    );
-    this.environment.showNotice("Select text in the page to add an annotation.");
-  }
-
   private async saveAnnotation(
-    annotation: { quote: string; target: HtmlAnnotation["target"] },
+    message: AnnotationSaveMessage,
     sourcePath: string
   ): Promise<void> {
-    const comment = await this.environment.promptAnnotation(annotation.quote);
-    if (!comment || comment.trim().length === 0) return;
-    await this.environment.annotationStore.addFileAnnotation(sourcePath, {
-      comment: comment.trim(),
-      id: this.environment.createAnnotationId?.() ?? createRenderId(),
-      quote: annotation.quote,
-      sourcePath,
-      target: annotation.target
-    });
-    this.environment.showNotice("Annotation added.");
-    await this.reload();
+    const annotation: HtmlAnnotation = {
+      ...message.annotation,
+      id:
+        message.annotation.id ??
+        this.environment.createAnnotationId?.() ??
+        createRenderId(),
+      sourcePath
+    };
+    try {
+      await this.environment.annotationService.save(sourcePath, annotation);
+      this.activeAnnotations = [
+        ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+        annotation
+      ];
+      this.postAnnotationResult(message.requestId, true, annotation);
+      this.environment.showNotice(
+        message.annotation.id ? "Annotation updated." : "Annotation added."
+      );
+    } catch (error) {
+      this.postAnnotationResult(message.requestId, false);
+      this.environment.showNotice(
+        `Could not save annotation: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   }
 
-  private openAnnotationManager(): void {
-    if (!this.file) return;
-    new AnnotationsModal(this.app, {
-      annotations: this.activeAnnotations,
-      onDelete: async (annotation) => {
-        await this.environment.annotationStore.removeAnnotation(annotation);
-        await this.reload();
+  private async deleteAnnotation(message: AnnotationDeleteMessage): Promise<void> {
+    const annotation = this.activeAnnotations.find(
+      (item) => item.id === message.annotationId
+    );
+    if (!annotation) {
+      this.postAnnotationResult(message.requestId, false);
+      return;
+    }
+    try {
+      await this.environment.annotationService.remove(annotation);
+      this.activeAnnotations = this.activeAnnotations.filter(
+        (item) => item.id !== annotation.id
+      );
+      this.postAnnotationResult(message.requestId, true);
+      this.environment.showNotice("Annotation deleted.");
+    } catch (error) {
+      this.postAnnotationResult(message.requestId, false);
+      this.environment.showNotice(
+        `Could not delete annotation: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+
+  private postAnnotationResult(
+    requestId: string,
+    ok: boolean,
+    annotation?: HtmlAnnotation
+  ): void {
+    this.frame?.contentWindow?.postMessage(
+      {
+        ...(annotation ? { annotation } : {}),
+        ok,
+        renderId: this.activeRenderId,
+        requestId,
+        type: ANNOTATION_RESULT_MESSAGE_TYPE
       },
-      onError: (message) => this.environment.showNotice(message)
-    }).open();
+      "*"
+    );
+  }
+
+  async focusAnnotation(id: string): Promise<boolean> {
+    if (!this.environment.getSettings().allowScripts ||
+      !this.frame?.contentWindow || !this.activeRenderId) return false;
+    const requestId = `focus-${++this.focusSequence}`;
+    return new Promise<boolean>((resolve) => {
+      const timeout = window.setTimeout(() => {
+        this.pendingFocus.delete(requestId);
+        resolve(false);
+      }, 1_500);
+      this.pendingFocus.set(requestId, { resolve, timeout });
+      this.frame?.contentWindow?.postMessage(
+        {
+          annotationId: id,
+          renderId: this.activeRenderId,
+          requestId,
+          type: ANNOTATION_FOCUS_MESSAGE_TYPE
+        },
+        "*"
+      );
+    });
+  }
+
+  private resolvePendingFocus(found: boolean): void {
+    for (const pending of this.pendingFocus.values()) {
+      window.clearTimeout(pending.timeout);
+      pending.resolve(found);
+    }
+    this.pendingFocus.clear();
   }
 
   private async loadCleanupRules(
@@ -577,33 +704,68 @@ export class HtmlPreviewView extends FileView {
   }
 }
 
-function parseAnnotationSelection(
-  value: unknown
-): { quote: string; target: HtmlAnnotation["target"] } | null {
-  if (!isRecord(value) || value.type !== ANNOTATION_SELECTED_MESSAGE_TYPE || !isRecord(value.annotation)) {
-    return null;
-  }
-  const annotation = value.annotation as Record<string, unknown>;
+function validRequestId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 128;
+}
+
+function validAnnotationId(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{32}$/.test(value);
+}
+
+function parseAnnotationSave(value: unknown): AnnotationSaveMessage | null {
+  if (!isRecord(value) || value.type !== ANNOTATION_SAVE_MESSAGE_TYPE ||
+    !validRequestId(value.requestId) || !isRecord(value.annotation)) return null;
+  const annotation = value.annotation;
   const target = annotation.target;
+  const color = annotationColor(annotation.color);
   if (
-    typeof annotation.quote !== "string" ||
+    color === null ||
+    typeof annotation.comment !== "string" || annotation.comment.length > 10_000 ||
+    typeof annotation.quote !== "string" || annotation.quote.length === 0 ||
+    annotation.quote.length > 20_000 ||
+    (annotation.id !== undefined && !validAnnotationId(annotation.id)) ||
     !isRecord(target) ||
-    typeof target.start !== "number" ||
-    typeof target.end !== "number" ||
-    typeof target.exact !== "string" ||
-    typeof target.prefix !== "string" ||
-    typeof target.suffix !== "string"
-  ) {
-    return null;
-  }
+    !Number.isSafeInteger(target.start) || !Number.isSafeInteger(target.end) ||
+    typeof target.start !== "number" || typeof target.end !== "number" ||
+    target.start < 0 || target.end <= target.start || target.end > 10_000_000 ||
+    typeof target.exact !== "string" || target.exact !== annotation.quote ||
+    typeof target.prefix !== "string" || target.prefix.length > 256 ||
+    typeof target.suffix !== "string" || target.suffix.length > 256
+  ) return null;
   return {
-    quote: annotation.quote,
-    target: {
-      end: target.end,
-      exact: target.exact,
-      prefix: target.prefix,
-      start: target.start,
-      suffix: target.suffix
-    }
+    annotation: {
+      color,
+      comment: annotation.comment,
+      ...(annotation.id ? { id: annotation.id } : {}),
+      quote: annotation.quote,
+      target: {
+        end: target.end,
+        exact: target.exact,
+        prefix: target.prefix,
+        start: target.start,
+        suffix: target.suffix
+      }
+    },
+    requestId: value.requestId
   };
+}
+
+function parseAnnotationDelete(value: unknown): AnnotationDeleteMessage | null {
+  return isRecord(value) &&
+    value.type === ANNOTATION_DELETE_MESSAGE_TYPE &&
+    validRequestId(value.requestId) &&
+    validAnnotationId(value.annotationId)
+    ? { annotationId: value.annotationId, requestId: value.requestId }
+    : null;
+}
+
+function parseAnnotationFocusResult(
+  value: unknown
+): { found: boolean; requestId: string } | null {
+  return isRecord(value) &&
+    value.type === ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE &&
+    validRequestId(value.requestId) &&
+    typeof value.found === "boolean"
+    ? { found: value.found, requestId: value.requestId }
+    : null;
 }
