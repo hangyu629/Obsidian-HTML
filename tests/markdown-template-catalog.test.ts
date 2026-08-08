@@ -58,8 +58,8 @@ describe("MarkdownTemplateCatalog", () => {
       {
         defaultTheme: "light",
         id: BUILT_IN_TEMPLATE_ID,
-        name: "Minimal",
-        themeIds: ["light"]
+        name: "Book Editorial",
+        themeIds: ["light", "dark"]
       },
       {
         defaultTheme: "light",

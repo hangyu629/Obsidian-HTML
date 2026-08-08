@@ -10,7 +10,7 @@ export interface HtmlPreviewSettings extends MarkdownTemplateSettings {
 export const DEFAULT_SETTINGS: HtmlPreviewSettings = {
   allowScripts: true,
   autoEnhanced: true,
-  defaultTemplateId: "minimal",
+  defaultTemplateId: "book-editorial",
   defaultThemeId: "light",
   folderMappings: []
 };
@@ -27,7 +27,11 @@ function normalizeMappings(value: unknown): FolderTemplateMapping[] {
     .map((mapping) => ({
       folder: typeof mapping.folder === "string" ? mapping.folder.trim() : "",
       templateId:
-        typeof mapping.templateId === "string" ? mapping.templateId.trim() : "",
+        typeof mapping.templateId === "string"
+          ? mapping.templateId.trim() === "minimal"
+            ? "book-editorial"
+            : mapping.templateId.trim()
+          : "",
       themeId: typeof mapping.themeId === "string" ? mapping.themeId.trim() : undefined
     }))
     .filter((mapping) => mapping.folder.length > 0 && mapping.templateId.length > 0);
@@ -41,7 +45,9 @@ export function normalizeSettings(value: unknown): HtmlPreviewSettings {
       typeof stored.autoEnhanced === "boolean" ? stored.autoEnhanced : true,
     defaultTemplateId:
       typeof stored.defaultTemplateId === "string" && stored.defaultTemplateId.length > 0
-        ? stored.defaultTemplateId
+        ? stored.defaultTemplateId === "minimal"
+          ? "book-editorial"
+          : stored.defaultTemplateId
         : DEFAULT_SETTINGS.defaultTemplateId,
     defaultThemeId:
       typeof stored.defaultThemeId === "string" && stored.defaultThemeId.length > 0
@@ -93,7 +99,7 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
         text
           .setValue(this.plugin.settings.defaultTemplateId)
           .onChange(async (value) => {
-            this.plugin.settings.defaultTemplateId = value.trim() || "minimal";
+            this.plugin.settings.defaultTemplateId = value.trim() || "book-editorial";
             await this.plugin.saveSettings();
           })
       );
@@ -118,7 +124,7 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
           .onClick(async () => {
             this.plugin.settings.folderMappings = [
               ...this.plugin.settings.folderMappings,
-              { folder: "", templateId: "minimal", themeId: "light" }
+              { folder: "", templateId: "book-editorial", themeId: "light" }
             ];
             await this.plugin.saveSettings();
             this.display();

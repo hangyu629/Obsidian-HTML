@@ -31,7 +31,7 @@ function harness(
   read: (current: TFile) => Promise<string> = async () => "# Note",
   resolveTemplate = vi.fn(() => ({
     source: "default" as const,
-    templateId: "minimal",
+    templateId: "book-editorial",
     themeId: "light"
   }))
 ) {

@@ -42,6 +42,8 @@ Restart Obsidian, open **Settings -> Community plugins**, and enable **HTML Prev
 
 Enhanced reading keeps the normal Markdown editor and source file intact. Use the **Enhanced reading** command or the book action on a Markdown view to open a rendered page. The renderer is Obsidian's native `MarkdownRenderer`, so core headings, lists, tables, tasks, callouts, code, math, links, embeds, Properties, and footnotes retain Obsidian behavior. Use **Open native Markdown** to return to the normal view.
 
+The built-in **Book Editorial** template is the default. It uses a book-like single-column layout, an editorial cover, paper-toned light and dark themes, and dedicated presentation for Properties, the table of contents, quotes, Callouts, tables, code, task lists, math, embeds, and footnotes.
+
 Templates are Vault-backed packages under:
 
 ```text
@@ -122,5 +124,7 @@ Fixtures for manual Vault smoke testing are in `tests/fixtures/`.
 清理功能依赖 **Allow page JavaScript**；关闭此设置后不会应用规则，也不能选择元素。跨域 iframe、canvas、视频或图片内部的内容不能单独选择，只能隐藏它们的外层元素。
 
 增强 Markdown 阅读不会改变 `.md` 源文件。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 Vault 的 `.html-preview/markdown-templates/` 中保存完整布局模板。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
+
+内置默认模板为 **Book Editorial**：它采用书籍式单栏、封面标题区和浅色/深色纸张主题，并专门处理 Properties、目录、引用、Callout、表格、代码、任务、数学公式、嵌入与脚注。
 
 首次使用前请阅读上面的 **Security** 与 **Compatibility Limits**。不信任的 HTML 可能通过脚本发起网络请求，可在插件设置中关闭 **Allow page JavaScript**。

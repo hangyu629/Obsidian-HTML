@@ -7,14 +7,14 @@ import {
 
 const settings: MarkdownTemplateSettings = {
   autoEnhanced: true,
-  defaultTemplateId: "minimal",
+  defaultTemplateId: "book-editorial",
   defaultThemeId: "light",
   folderMappings: [
     { folder: "docs", templateId: "editorial", themeId: "dark" },
     { folder: "docs/reports", templateId: "report", themeId: "light" }
   ]
 };
-const available = new Set(["minimal", "editorial", "report"]);
+const available = new Set(["book-editorial", "editorial", "report"]);
 
 describe("Markdown template rule resolution", () => {
   it("uses valid frontmatter before folder mappings", () => {
@@ -85,7 +85,7 @@ describe("Markdown template rule resolution", () => {
       )
     ).toEqual({
       source: "default",
-      templateId: "minimal",
+      templateId: "book-editorial",
       themeId: "light"
     });
   });

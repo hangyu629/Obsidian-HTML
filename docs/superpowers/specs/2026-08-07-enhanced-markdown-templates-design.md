@@ -74,7 +74,7 @@ Templates live under:
 
 `styles.css` and the selected theme stylesheet are scoped to the enhanced view root. Relative asset references resolve only inside the template package. Network resources are rejected by default. Template HTML cannot contain `script`, event-handler attributes, `form`, `iframe`, `object`, or meta refresh elements.
 
-Invalid templates produce a diagnostic and fall back to a built-in minimal template. Unknown template fields are ignored so future metadata can be added without breaking older versions.
+Invalid templates produce a diagnostic and fall back to the built-in Book Editorial template. Unknown template fields are ignored so future metadata can be added without breaking older versions.
 
 ## Rendering Architecture
 

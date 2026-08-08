@@ -30,7 +30,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   markdownTemplateCatalog!: MarkdownTemplateCatalog;
   markdownTemplateSettings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   private readonly knownVaultPaths = new Set<string>();
-  private markdownTemplateIds = new Set(["minimal"]);
+  private markdownTemplateIds = new Set(["book-editorial"]);
   private readonly enhancedLeaves = new WeakSet<object>();
 
   async onload(): Promise<void> {

@@ -54,7 +54,7 @@ describe("Markdown plugin integration", () => {
       expect.objectContaining({ extensions: expect.arrayContaining(["md"]) })
     );
     expect(plugin.markdownTemplateCatalog).toBeDefined();
-    expect(plugin.settings.defaultTemplateId).toBe("minimal");
+    expect(plugin.settings.defaultTemplateId).toBe("book-editorial");
     expect(MARKDOWN_TEMPLATE_ROOT).toBe(".html-preview/markdown-templates");
   });
 });

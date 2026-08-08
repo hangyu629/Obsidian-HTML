@@ -74,7 +74,7 @@ describe("renderEnhancedMarkdown", () => {
     expect(style?.textContent).toContain("--accent: green");
     expect(style?.textContent).not.toContain(":root");
     expect(root.querySelector("img")?.getAttribute("src")).toBe(
-      "app://vault/.html-preview/markdown-templates/minimal/assets/banner.png"
+      "app://vault/.html-preview/markdown-templates/book-editorial/assets/banner.png"
     );
   });
 
@@ -114,5 +114,30 @@ describe("renderEnhancedMarkdown", () => {
     });
 
     expect(source).toBe("# Original\n\n[[Linked note]]");
+  });
+
+  it("provides the editorial cover, themes, and core Markdown styling contract", () => {
+    expect(BUILT_IN_TEMPLATE.manifest).toMatchObject({
+      id: "book-editorial",
+      name: "Book Editorial",
+      themes: expect.arrayContaining([
+        expect.objectContaining({ id: "light" }),
+        expect.objectContaining({ id: "dark" })
+      ])
+    });
+    expect(BUILT_IN_TEMPLATE.layout).toContain("book-editorial-cover");
+    expect(BUILT_IN_TEMPLATE.layout).toContain('data-slot="toc"');
+    for (const selector of [
+      ".book-editorial-content h1",
+      ".book-editorial-content blockquote",
+      ".book-editorial-content .callout",
+      ".book-editorial-content table",
+      ".book-editorial-content pre",
+      ".book-editorial-content .task-list-item-checkbox",
+      ".book-editorial-content .math-block",
+      ".book-editorial-content .footnotes"
+    ]) {
+      expect(BUILT_IN_TEMPLATE.styles).toContain(selector);
+    }
   });
 });

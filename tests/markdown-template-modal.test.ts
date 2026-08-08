@@ -7,7 +7,7 @@ describe("MarkdownTemplateModal", () => {
     const onSelect = vi.fn();
     const modal = new MarkdownTemplateModal({} as never, {
       list: vi.fn(async () => [
-        { defaultTheme: "light", id: "minimal", name: "Minimal", themeIds: ["light", "dark"] }
+        { defaultTheme: "light", id: "book-editorial", name: "Book Editorial", themeIds: ["light", "dark"] }
       ]),
       onSelect
     });
@@ -15,9 +15,9 @@ describe("MarkdownTemplateModal", () => {
     modal.open();
     await Promise.resolve();
     await Promise.resolve();
-    const button = modal.contentEl.querySelector("button[data-template-id=minimal][data-theme-id=dark]");
+    const button = modal.contentEl.querySelector("button[data-template-id=book-editorial][data-theme-id=dark]");
     expect(button).not.toBeNull();
     (button as HTMLButtonElement | null)?.click();
-    expect(onSelect).toHaveBeenCalledWith({ templateId: "minimal", themeId: "dark" });
+    expect(onSelect).toHaveBeenCalledWith({ templateId: "book-editorial", themeId: "dark" });
   });
 });
