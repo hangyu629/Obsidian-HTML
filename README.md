@@ -10,7 +10,7 @@ Preview `.html` and `.htm` files stored in an Obsidian Vault. HTML remains an or
 - Opens Vault-local links through Obsidian and web, email, or telephone links externally.
 - Runs page JavaScript by default in a sandboxed iframe.
 - Hides unwanted page regions with reversible file- or folder-scoped cleanup rules.
-- Adds file-scoped annotations to HTML previews without changing the source HTML.
+- Adds file-scoped annotations to HTML previews and enhanced Markdown reading without changing source files.
 - Supports Obsidian Desktop, iOS, and Android without a local server or Electron-only APIs.
 - Never changes the source HTML or its assets.
 
@@ -38,11 +38,14 @@ Restart Obsidian, open **Settings -> Community plugins**, and enable **HTML Prev
 3. Select the HTML file in Obsidian's file explorer.
 4. Select **Clean up page**, then point to and select an unwanted region. On touch devices, confirm with **Hide**.
 5. Use **Undo cleanup** for the latest cleanup made in the current view, or **Manage cleanup rules** to restore, promote, or reset persistent rules.
-6. Select **Add annotation**, then highlight text inside the HTML page. Enter a note when prompted. Use **Manage annotations** to review or delete saved annotations.
+6. Select text inside the HTML page. Choose **颜色** for a highlight-only annotation, or **注释** to open the nearby editor. Click an existing highlight to change its color, edit its comment, or delete it.
+7. Run **Open annotation sidebar** from the command palette to browse the current file's annotations. Selecting an item scrolls its highlight into view.
 
 ## Enhanced Markdown Reading
 
 Enhanced reading keeps the normal Markdown editor and source file intact. Use the **Enhanced reading** action from either Markdown source mode or native Markdown preview mode to open a rendered page. In enhanced reading, **Source** returns to Markdown source mode, **Preview** returns to native Markdown preview mode, and **Template & theme** changes the current template without splitting the page or opening another tab. Returning to source or preview keeps that native Markdown mode for the current note instead of immediately reopening enhanced reading. The renderer is Obsidian's native `MarkdownRenderer`, so core headings, lists, tables, tasks, callouts, code, math, links, embeds, Properties, and footnotes retain Obsidian behavior.
+
+Enhanced reading uses the same contextual annotation controls as HTML Preview. Select text to reveal **颜色** and **注释**; click an existing highlight to edit or delete it. The annotation sidebar follows the active HTML or Markdown file. Saved highlights appear only in enhanced reading; native Markdown source and preview remain unchanged.
 
 The built-in **Book Editorial** template is the default. It uses a book-like single-column layout, an editorial cover, paper-toned light and dark themes, and dedicated presentation for Properties, the table of contents, quotes, Callouts, tables, code, task lists, math, embeds, and footnotes. **Magazine Research** is also available as a built-in option: it uses a navy editorial masthead, coral and sage accents, a combined Contents/Properties band, and a wide research-report reading column.
 
@@ -73,18 +76,19 @@ The equivalent flat keys are `html-preview.template` and `html-preview.theme`. W
 
 Cleanup changes only the preview DOM. The HTML file and its asset files are never edited. New rules apply to the current file by default. In **Manage cleanup rules**, a file rule can be promoted to its containing folder so it also applies to other HTML files under that folder.
 
-HTML annotations also change only the preview DOM. They are stored separately from the page source and replayed when the same HTML file is opened again. This annotation layer applies only to HTML previews; it does not appear in enhanced Markdown reading.
+Annotations also change only the rendered DOM. They are stored separately from HTML and Markdown source files, then replayed in HTML preview or enhanced Markdown reading. They never appear in native Markdown source or preview.
 
 Rules are stored inside the Vault:
 
 ```text
 .html-preview/cleanup/pages/<HTML path>.json
 .html-preview/cleanup/folder-rules.json
+.html-preview/annotations/pages/<source path>.json
 ```
 
 Renaming an HTML file migrates its file-scoped rules. Folder rules use path prefixes and are not automatically rewritten when an entire folder is renamed. Hidden Vault data syncs only when the selected sync provider includes hidden files.
 
-Page cleanup requires **Allow page JavaScript** because rule replay and element selection run inside the isolated preview frame. Disabling that setting disables both replay and selection.
+Page cleanup and HTML annotation interaction require **Allow page JavaScript** because they run inside the isolated preview frame. Disabling that setting disables cleanup replay, cleanup selection, HTML highlights, and the HTML contextual annotation controls. Enhanced Markdown annotations do not depend on this setting.
 
 ## Security
 
@@ -125,9 +129,11 @@ Fixtures for manual Vault smoke testing are in `tests/fixtures/`.
 
 清理规则保存在 Vault 内的 `.html-preview/cleanup/`。默认规则只作用于当前 HTML；提升后的文件夹规则作用于该目录及子目录。重命名 HTML 文件时会迁移文件规则，但整目录重命名不会自动改写文件夹规则。同步工具是否同步这些数据，取决于它是否包含隐藏目录。
 
-清理功能依赖 **Allow page JavaScript**；关闭此设置后不会应用规则，也不能选择元素。跨域 iframe、canvas、视频或图片内部的内容不能单独选择，只能隐藏它们的外层元素。
+清理功能和 HTML 批注交互依赖 **Allow page JavaScript**；关闭此设置后不会应用清理规则或 HTML 高亮，也不能选择元素或添加 HTML 批注。增强 Markdown 批注不依赖这个设置。跨域 iframe、canvas、视频或图片内部的内容不能单独选择，只能隐藏它们的外层元素。
 
 增强 Markdown 阅读不会改变 `.md` 源文件。源码模式和 Obsidian 原生预览模式都可以点击 **Enhanced reading** 进入增强阅读；进入后，右上角的 **Source**、**Preview** 可以直接切回对应模式，**Template & theme** 可以切换当前模板，不会分屏或新开标签。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 **设置 → Folder template mappings** 中按 Vault 文件夹选择模板和主题；子文件夹继承规则，最具体的文件夹优先。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
+
+在 HTML 预览或增强 Markdown 阅读中选中文字，会自动出现 **颜色** 和 **注释**。**颜色** 用于直接建立五色高亮，**注释** 会打开文字附近的批注编辑器；点击已有高亮可以改色、修改文字或删除。命令面板运行 **Open annotation sidebar** 可在右侧打开“注释”栏，按文档顺序浏览、筛选并定位高亮。批注只显示在 HTML 预览和增强阅读中，不会写入或显示在 Markdown 源码及 Obsidian 原生预览里。
 
 内置默认模板为 **Book Editorial**：它采用书籍式单栏、封面标题区和浅色/深色纸张主题，并专门处理 Properties、目录、引用、Callout、表格、代码、任务、数学公式、嵌入与脚注。
 

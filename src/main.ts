@@ -43,6 +43,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   private readonly knownVaultPaths = new Set<string>();
   private markdownTemplateIds = new Set(["book-editorial"]);
   private readonly enhancedLeaves = new WeakSet<object>();
+  private lastAnnotationSourcePath: string | null = null;
   private readonly nativeMarkdownPaths = new WeakMap<object, string>();
 
   async onload(): Promise<void> {
@@ -257,10 +258,17 @@ export default class HtmlPreviewPlugin extends Plugin {
   private async updateAnnotationSidebars(activeLeaf: any): Promise<void> {
     const file = activeLeaf?.view?.file;
     const extension = file instanceof TFile ? file.extension.toLowerCase() : "";
-    const sourcePath = file instanceof TFile &&
+    let sourcePath = file instanceof TFile &&
       (extension === "html" || extension === "htm" || extension === "md")
       ? file.path
       : null;
+    if (sourcePath) {
+      this.lastAnnotationSourcePath = sourcePath;
+    } else if (activeLeaf?.view?.getViewType?.() === ANNOTATION_SIDEBAR_VIEW_TYPE) {
+      sourcePath = this.lastAnnotationSourcePath;
+    } else {
+      this.lastAnnotationSourcePath = null;
+    }
     for (const leaf of this.app.workspace.getLeavesOfType?.(
       ANNOTATION_SIDEBAR_VIEW_TYPE
     ) ?? []) {

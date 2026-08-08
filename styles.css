@@ -261,6 +261,8 @@
   padding: 10px 11px;
   font-size: var(--font-ui-small);
   line-height: 1.55;
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 .annotation-editor-comment:focus {

@@ -43,7 +43,7 @@ export function createAnnotationRuntimeScript(
     .annotation-editor-header { justify-content: space-between !important; min-height: 44px !important; padding: 8px 10px 6px 14px !important; font-size: 12px !important; }
     .annotation-editor-close { display: grid !important; place-items: center !important; width: 28px !important; height: 28px !important; padding: 0 !important; border: 0 !important; border-radius: 5px !important; color: #71766f !important; background: transparent !important; font-size: 19px !important; }
     .annotation-editor-quote { display: -webkit-box !important; overflow: hidden !important; margin: 0 14px 12px !important; padding: 1px 0 1px 10px !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; border-left: 3px solid rgba(238,199,92,.72) !important; color: #666b65 !important; font-family: Georgia, serif !important; font-size: 12px !important; font-style: normal !important; line-height: 1.55 !important; }
-    .annotation-editor-comment { display: block !important; width: calc(100% - 28px) !important; min-height: 92px !important; margin: 0 14px !important; resize: vertical !important; border: 1px solid #d9dcd5 !important; border-radius: 6px !important; color: #252824 !important; background: #fafaf8 !important; padding: 10px 11px !important; font-size: 13px !important; line-height: 1.55 !important; }
+    .annotation-editor-comment { display: block !important; width: calc(100% - 28px) !important; min-height: 92px !important; margin: 0 14px !important; resize: vertical !important; border: 1px solid #d9dcd5 !important; border-radius: 6px !important; color: #252824 !important; background: #fafaf8 !important; padding: 10px 11px !important; font-size: 13px !important; line-height: 1.55 !important; -webkit-user-select: text !important; user-select: text !important; }
     .annotation-editor-actions { justify-content: space-between !important; gap: 10px !important; padding: 12px 14px 14px !important; }
     .annotation-editor-commands { gap: 7px !important; margin-left: auto !important; }
     .annotation-editor-delete, .annotation-editor-secondary, .annotation-editor-primary { min-height: 30px !important; padding: 5px 10px !important; border-radius: 5px !important; font-size: 12px !important; font-weight: 600 !important; }
@@ -195,7 +195,6 @@ export function createAnnotationRuntimeScript(
       closeSurface();
       surface = element;
       element.classList.add("obsidian-html-preview-annotation-ui");
-      element.addEventListener("mousedown", (event) => event.preventDefault());
       document.body.append(element);
       place(element, anchor);
     };
@@ -315,6 +314,7 @@ export function createAnnotationRuntimeScript(
       toolbar.className = "annotation-selection-toolbar";
       toolbar.setAttribute("role", "toolbar");
       toolbar.setAttribute("aria-label", "选中文字操作");
+      toolbar.addEventListener("mousedown", (event) => event.preventDefault());
       const color = button("颜色", "annotation-toolbar-button");
       const comment = button("注释", "annotation-toolbar-button");
       color.addEventListener("click", () => {

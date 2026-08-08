@@ -8,6 +8,7 @@ import { MARKDOWN_TEMPLATE_ROOT } from "../src/markdown/templates/catalog";
 
 function appHarness() {
   const events = new Map<string, (...args: unknown[]) => void>();
+  const workspaceLeaves: unknown[] = [];
   const adapter = {
     exists: vi.fn(async () => false),
     list: vi.fn(async () => ({ files: [], folders: [] })),
@@ -32,13 +33,15 @@ function appHarness() {
     },
     workspace: {
       activeLeaf: null as unknown,
+      getLeavesOfType: vi.fn(() => workspaceLeaves),
+      getMostRecentLeaf: vi.fn(() => app.workspace.activeLeaf),
       on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
         events.set(name, callback);
         return { name };
       })
     }
   };
-  return { app, events };
+  return { app, events, workspaceLeaves };
 }
 
 describe("Markdown plugin integration", () => {
@@ -143,6 +146,44 @@ describe("Markdown plugin integration", () => {
     expect(leaf.setViewState).toHaveBeenCalledWith(
       { state: { file: "notes/Note.md", mode: "source" }, type: "markdown" },
       { history: true }
+    );
+  });
+
+  it("keeps the last document source when the annotation sidebar becomes active", async () => {
+    const { app, workspaceLeaves } = appHarness();
+    const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
+    await plugin.onload();
+    const factory = (plugin as unknown as {
+      registeredViews: Map<string, (leaf: unknown) => any>;
+    }).registeredViews.get(ANNOTATION_SIDEBAR_VIEW_TYPE)!;
+    const sidebarLeaf = Object.assign(Object.create(Object.prototype), { app });
+    const sidebar = factory(sidebarLeaf);
+    sidebarLeaf.view = sidebar;
+    sidebar.onload();
+    workspaceLeaves.push(sidebarLeaf);
+    const documentLeaf = {
+      view: {
+        file: Object.assign(Object.create(TFile.prototype), {
+          basename: "Note",
+          extension: "md",
+          name: "Note.md",
+          path: "notes/Note.md"
+        })
+      }
+    };
+
+    await (plugin as unknown as {
+      updateAnnotationSidebars(leaf: unknown): Promise<void>;
+    }).updateAnnotationSidebars(documentLeaf);
+    expect(sidebar.contentEl.textContent).toContain("当前文件还没有注释");
+
+    await (plugin as unknown as {
+      updateAnnotationSidebars(leaf: unknown): Promise<void>;
+    }).updateAnnotationSidebars(sidebarLeaf);
+
+    expect(sidebar.contentEl.textContent).toContain("当前文件还没有注释");
+    expect(sidebar.contentEl.textContent).not.toContain(
+      "打开 HTML 或 Markdown 文件以查看注释"
     );
   });
 });

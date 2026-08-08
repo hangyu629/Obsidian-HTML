@@ -89,6 +89,9 @@ describe("AnnotationContextualUi", () => {
     const editor = host.querySelector<HTMLElement>('[role="dialog"]');
     const textarea = editor?.querySelector<HTMLTextAreaElement>("textarea");
     expect(document.activeElement).toBe(textarea);
+    const pointer = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    textarea?.dispatchEvent(pointer);
+    expect(pointer.defaultPrevented).toBe(false);
     expect(editor?.textContent).toContain("仅高亮");
     textarea!.value = "New thought";
     textarea?.dispatchEvent(

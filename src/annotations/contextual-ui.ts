@@ -43,6 +43,7 @@ export class AnnotationContextualUi {
     const toolbar = this.createSurface("div", "annotation-selection-toolbar");
     toolbar.setAttribute("role", "toolbar");
     toolbar.setAttribute("aria-label", "选中文字操作");
+    toolbar.addEventListener("mousedown", (event) => event.preventDefault());
 
     const color = this.button("颜色", "annotation-toolbar-button");
     const comment = this.button("注释", "annotation-toolbar-button");
@@ -217,7 +218,6 @@ export class AnnotationContextualUi {
   private createSurface(tag: "div", className: string): HTMLElement {
     const surface = document.createElement(tag);
     surface.className = `annotation-contextual-surface ${className}`;
-    surface.addEventListener("mousedown", (event) => event.preventDefault());
     return surface;
   }
 

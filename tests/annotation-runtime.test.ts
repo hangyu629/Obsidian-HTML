@@ -89,7 +89,11 @@ describe("annotation runtime", () => {
     expect(mark?.dataset.annotationColor).toBe("green");
     mark?.click();
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(document.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("");
+    const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
+    expect(textarea?.value).toBe("");
+    const pointer = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    textarea?.dispatchEvent(pointer);
+    expect(pointer.defaultPrevented).toBe(false);
 
     mark!.scrollIntoView = vi.fn();
     window.dispatchEvent(
