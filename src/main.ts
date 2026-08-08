@@ -9,14 +9,29 @@ import { PreviewCoordinator } from "./preview/preview-coordinator";
 import {
   DEFAULT_SETTINGS,
   HtmlPreviewSettingTab,
+  normalizeSettings,
   type HtmlPreviewSettings
 } from "./settings";
+import {
+  EnhancedMarkdownView,
+  ENHANCED_MARKDOWN_VIEW_TYPE
+} from "./markdown/enhanced-markdown-view";
+import {
+  MarkdownTemplateCatalog,
+  type MarkdownTemplateCatalogAdapter
+} from "./markdown/templates/catalog";
+import { resolveMarkdownTemplate } from "./markdown/rules";
+import { MarkdownTemplateModal } from "./markdown/template-modal";
 
 export default class HtmlPreviewPlugin extends Plugin {
   readonly coordinator = new PreviewCoordinator();
   cleanupStore!: CleanupRuleStore;
   settings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
+  markdownTemplateCatalog!: MarkdownTemplateCatalog;
+  markdownTemplateSettings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   private readonly knownVaultPaths = new Set<string>();
+  private markdownTemplateIds = new Set(["minimal"]);
+  private readonly enhancedLeaves = new WeakSet<object>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -26,6 +41,42 @@ export default class HtmlPreviewPlugin extends Plugin {
       ({ message, path }) => {
         new Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
       }
+    );
+
+    this.markdownTemplateCatalog = new MarkdownTemplateCatalog(
+      this.app.vault.adapter as MarkdownTemplateCatalogAdapter
+    );
+    this.markdownTemplateIds = new Set(
+      (await this.markdownTemplateCatalog.list()).map((template) => template.id)
+    );
+    this.markdownTemplateSettings = this.settings;
+
+    this.registerView(
+      ENHANCED_MARKDOWN_VIEW_TYPE,
+      (leaf) =>
+        new EnhancedMarkdownView(leaf, {
+          coordinator: this.coordinator,
+          getFrontmatter: (file) =>
+            this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {},
+          loadTemplate: (templateId) => this.markdownTemplateCatalog.load(templateId),
+          onSwitchTemplate: (path) => {
+            this.openTemplateChooser(path);
+          },
+          resolveAsset: (path) => {
+            const file = this.app.vault.getAbstractFileByPath(path);
+            return file instanceof TFile
+              ? this.app.vault.getResourcePath(file)
+              : null;
+          },
+          resolveTemplate: (path, frontmatter, mode) =>
+            resolveMarkdownTemplate(
+              path,
+              frontmatter,
+              this.markdownTemplateSettings,
+              this.markdownTemplateIds,
+              mode
+            )
+        })
     );
 
     this.registerView(
@@ -46,6 +97,27 @@ export default class HtmlPreviewPlugin extends Plugin {
     );
     this.registerExtensions(["html", "htm"], HTML_PREVIEW_VIEW_TYPE);
     this.addSettingTab(new HtmlPreviewSettingTab(this.app, this));
+    this.addCommand({
+      id: "open-enhanced-markdown-reading",
+      name: "Open enhanced Markdown reading",
+      callback: () => {
+        const leaf = this.app.workspace.getMostRecentLeaf();
+        const file = (leaf?.view as any)?.file;
+        if (file instanceof TFile) void this.openEnhancedMarkdown(file.path, "manual");
+      }
+    });
+
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        this.installMarkdownAction(leaf);
+        void this.maybeAutoOpen(leaf);
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("file-open", () => {
+        void this.maybeAutoOpen(this.app.workspace.activeLeaf);
+      })
+    );
 
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
@@ -93,8 +165,8 @@ export default class HtmlPreviewPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const stored = (await this.loadData()) as Partial<HtmlPreviewSettings> | null;
-    this.settings = { ...DEFAULT_SETTINGS, ...stored };
+    this.settings = normalizeSettings(await this.loadData());
+    this.markdownTemplateSettings = this.settings;
   }
 
   async saveSettings(): Promise<void> {
@@ -114,6 +186,93 @@ export default class HtmlPreviewPlugin extends Plugin {
     for (const file of this.app.vault.getFiles()) {
       this.knownVaultPaths.add(file.path);
     }
+  }
+
+  private installMarkdownAction(leaf: any): void {
+    const view = leaf?.view;
+    if (!view || view.getViewType?.() !== "markdown" || this.enhancedLeaves.has(view)) {
+      return;
+    }
+    this.enhancedLeaves.add(view);
+    view.addAction?.("book-open-check", "Enhanced reading", () => {
+      const file = view.file;
+      if (file instanceof TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
+    });
+  }
+
+  private async maybeAutoOpen(leaf: any): Promise<void> {
+    if (!this.settings.autoEnhanced || !leaf?.view || leaf.view.getViewType?.() !== "markdown") {
+      return;
+    }
+    const file = leaf.view.file;
+    if (!(file instanceof TFile)) return;
+    const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
+    const selection = resolveMarkdownTemplate(
+      file.path,
+      frontmatter,
+      this.markdownTemplateSettings,
+      this.markdownTemplateIds,
+      "automatic"
+    );
+    if (selection) {
+      await leaf.setViewState(
+        {
+          type: ENHANCED_MARKDOWN_VIEW_TYPE,
+          state: {
+            file: file.path,
+            mode: "automatic",
+            templateId: selection.templateId,
+            themeId: selection.themeId
+          }
+        },
+        { history: true }
+      );
+    }
+  }
+
+  private async openEnhancedMarkdown(
+    sourcePath: string,
+    mode: "automatic" | "manual",
+    leaf = this.app.workspace.getMostRecentLeaf(),
+    selected?: { templateId: string; themeId: string }
+  ): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(sourcePath);
+    if (!(file instanceof TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
+    const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
+    const selection = selected
+      ? { source: "default" as const, ...selected }
+      : resolveMarkdownTemplate(
+          sourcePath,
+          frontmatter,
+          this.markdownTemplateSettings,
+          this.markdownTemplateIds,
+          mode
+        );
+    if (!selection) {
+      new Notice("No valid Markdown template is available for this note.");
+      return;
+    }
+    await leaf.setViewState(
+      {
+        type: ENHANCED_MARKDOWN_VIEW_TYPE,
+        state: {
+          file: sourcePath,
+          mode,
+          templateId: selection.templateId,
+          themeId: selection.themeId
+        }
+      },
+      { history: true }
+    );
+  }
+
+  private openTemplateChooser(sourcePath: string): void {
+    new MarkdownTemplateModal(this.app, {
+      list: () => this.markdownTemplateCatalog.list(),
+      onSelect: (selection) => {
+        void this.openEnhancedMarkdown(sourcePath, "manual", undefined, selection);
+      }
+    }).open();
   }
 }
 
