@@ -63,15 +63,48 @@ describe("Markdown plugin integration", () => {
     expect(MARKDOWN_TEMPLATE_ROOT).toBe(".html-preview/markdown-templates");
   });
 
-  it("does not reopen enhanced reading after the user returns to native Markdown", async () => {
+  it("uses the global default template when default enhanced preview is enabled", async () => {
     const { app } = appHarness();
     const leaf = {
+      app,
       setViewState: vi.fn(async () => undefined),
       view: Object.assign(Object.create(Object.prototype), {
         file: Object.assign(Object.create(TFile.prototype), {
           basename: "Note", extension: "md", name: "Note.md", path: "notes/Note.md"
         }),
-        getViewType: () => "markdown"
+        getViewType: () => "markdown",
+        getMode: () => "source"
+      })
+    };
+    app.workspace.activeLeaf = leaf;
+    const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
+    await plugin.onload();
+    await (plugin as unknown as { maybeAutoOpen(leaf: unknown): Promise<void> }).maybeAutoOpen(leaf);
+
+    expect(leaf.setViewState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: ENHANCED_MARKDOWN_VIEW_TYPE,
+        state: expect.objectContaining({
+          file: "notes/Note.md",
+          returnMode: "source",
+          templateId: "book-editorial"
+        })
+      }),
+      { history: true }
+    );
+  });
+
+  it("does not reopen enhanced reading after the user returns to native Markdown", async () => {
+    const { app } = appHarness();
+    const leaf = {
+      app,
+      setViewState: vi.fn(async () => undefined),
+      view: Object.assign(Object.create(Object.prototype), {
+        file: Object.assign(Object.create(TFile.prototype), {
+          basename: "Note", extension: "md", name: "Note.md", path: "notes/Note.md"
+        }),
+        getViewType: () => "markdown",
+        getMode: () => "source"
       })
     };
     app.workspace.activeLeaf = leaf;
@@ -82,12 +115,19 @@ describe("Markdown plugin integration", () => {
     const enhanced = environment?.(leaf) as {
       onload(): void;
       onLoadFile(file: TFile): Promise<void>;
-      openNativeMarkdown(): Promise<void>;
+      openMarkdownMarkdown(): Promise<void>;
     };
     enhanced.onload();
+    await (enhanced as unknown as { setState(state: Record<string, unknown>): Promise<void> }).setState({
+      file: "notes/Note.md",
+      mode: "automatic",
+      returnMode: "source",
+      templateId: "book-editorial",
+      themeId: "light"
+    });
     await enhanced.onLoadFile(leaf.view.file);
 
-    await enhanced.openNativeMarkdown();
+    await enhanced.openMarkdownMarkdown();
     await (plugin as unknown as { maybeAutoOpen(leaf: unknown): Promise<void> }).maybeAutoOpen(leaf);
 
     expect(leaf.setViewState).toHaveBeenCalledTimes(1);

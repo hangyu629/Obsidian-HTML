@@ -78,7 +78,10 @@ describe("EnhancedMarkdownView", () => {
       "# Note"
     );
     expect(actions(view).map((action) => action.title)).toEqual(
-      expect.arrayContaining(["Source", "Preview", "Template & theme"])
+      expect.arrayContaining(["Markdown", "Template & theme"])
+    );
+    expect(actions(view).map((action) => action.title)).not.toEqual(
+      expect.arrayContaining(["Source", "Preview"])
     );
   });
 
@@ -109,7 +112,7 @@ describe("EnhancedMarkdownView", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(read).toHaveBeenCalled();
 
-    const nativeAction = actions(view).find((action) => action.title === "Source");
+    const nativeAction = actions(view).find((action) => action.title === "Markdown");
     await nativeAction?.callback(new MouseEvent("click"));
     expect(vi.spyOn(leaf, "setViewState")).not.toHaveBeenCalled();
   });
@@ -118,24 +121,31 @@ describe("EnhancedMarkdownView", () => {
     const { leaf, onReturnToMarkdown, view } = harness();
     await view.onLoadFile(file("notes/example.md"));
     const setViewState = vi.spyOn(leaf, "setViewState");
-    await view.openNativeMarkdown();
+    await view.openMarkdownMarkdown();
 
     expect(setViewState).toHaveBeenCalledWith(
-      { state: { file: "notes/example.md", mode: "source" }, type: "markdown" },
+      { state: { file: "notes/example.md", mode: "preview" }, type: "markdown" },
       { history: true }
     );
     expect(onReturnToMarkdown).toHaveBeenCalledOnce();
   });
 
-  it("switches the current leaf to native Markdown preview mode", async () => {
+  it("restores the source mode captured before enhanced reading", async () => {
     const { leaf, onReturnToMarkdown, view } = harness();
+    await view.setState({
+      file: "notes/example.md",
+      mode: "manual",
+      returnMode: "source",
+      templateId: "book-editorial",
+      themeId: "light"
+    });
     await view.onLoadFile(file("notes/example.md"));
     const setViewState = vi.spyOn(leaf, "setViewState");
 
-    await view.openMarkdownPreview();
+    await view.openMarkdownMarkdown();
 
     expect(setViewState).toHaveBeenCalledWith(
-      { state: { file: "notes/example.md", mode: "preview" }, type: "markdown" },
+      { state: { file: "notes/example.md", mode: "source" }, type: "markdown" },
       { history: true }
     );
     expect(onReturnToMarkdown).toHaveBeenCalledOnce();

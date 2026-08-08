@@ -24,6 +24,7 @@ export interface EnhancedMarkdownViewEnvironment {
 interface EnhancedMarkdownViewState {
   file?: string;
   mode?: TemplateResolutionMode;
+  returnMode?: "source" | "preview";
   templateId?: string;
   themeId?: string;
 }
@@ -37,6 +38,7 @@ export class EnhancedMarkdownView extends FileView {
   private renderToken = 0;
   private sessionMode: TemplateResolutionMode = "manual";
   private sessionSelection: TemplateSelection | null = null;
+  private returnMode: "source" | "preview" = "preview";
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -66,6 +68,9 @@ export class EnhancedMarkdownView extends FileView {
     if (state.mode === "automatic" || state.mode === "manual") {
       this.sessionMode = state.mode;
     }
+    if (state.returnMode === "source" || state.returnMode === "preview") {
+      this.returnMode = state.returnMode;
+    }
     if (state.templateId && state.themeId) {
       this.sessionSelection = {
         source: "default",
@@ -85,11 +90,8 @@ export class EnhancedMarkdownView extends FileView {
   onload(): void {
     super.onload();
     this.contentEl.classList.add("enhanced-markdown-view");
-    this.addAction("file-text", "Source", () => {
-      void this.openNativeMarkdown();
-    });
-    this.addAction("book-open", "Preview", () => {
-      void this.openMarkdownPreview();
+    this.addAction("file-text", "Markdown", () => {
+      void this.openMarkdownMarkdown();
     });
     this.addAction("palette", "Template & theme", () => {
       if (this.file) void this.environment.onSwitchTemplate?.(this.file.path);
@@ -121,20 +123,11 @@ export class EnhancedMarkdownView extends FileView {
     await this.render();
   }
 
-  async openNativeMarkdown(): Promise<void> {
+  async openMarkdownMarkdown(): Promise<void> {
     if (!this.file) return;
     this.environment.onReturnToMarkdown?.(this.file.path);
     await this.leaf.setViewState(
-      { type: "markdown", state: { file: this.file.path, mode: "source" } },
-      { history: true }
-    );
-  }
-
-  async openMarkdownPreview(): Promise<void> {
-    if (!this.file) return;
-    this.environment.onReturnToMarkdown?.(this.file.path);
-    await this.leaf.setViewState(
-      { type: "markdown", state: { file: this.file.path, mode: "preview" } },
+      { type: "markdown", state: { file: this.file.path, mode: this.returnMode } },
       { history: true }
     );
   }

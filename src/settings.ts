@@ -82,8 +82,8 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
       );
 
     new Setting(this.containerEl)
-      .setName("Automatic enhanced Markdown reading")
-      .setDesc("Open matching Markdown notes in the enhanced reading view.")
+      .setName("Open Markdown in Enhanced Preview by default")
+      .setDesc("Open Markdown notes in Enhanced Preview automatically when they are opened.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.autoEnhanced)

@@ -234,14 +234,24 @@ export default class HtmlPreviewPlugin extends Plugin {
       this.markdownTemplateSettings,
       this.markdownTemplateIds,
       "automatic"
-    );
+    ) ?? (this.settings.autoEnhanced
+      ? resolveMarkdownTemplate(
+          file.path,
+          frontmatter,
+          this.markdownTemplateSettings,
+          this.markdownTemplateIds,
+          "manual"
+        )
+      : null);
     if (selection) {
+      const returnMode = leaf.view.getMode?.() === "source" ? "source" : "preview";
       await leaf.setViewState(
         {
           type: ENHANCED_MARKDOWN_VIEW_TYPE,
           state: {
             file: file.path,
             mode: "automatic",
+            returnMode,
             templateId: selection.templateId,
             themeId: selection.themeId
           }
@@ -274,12 +284,16 @@ export default class HtmlPreviewPlugin extends Plugin {
       new Notice("No valid Markdown template is available for this note.");
       return;
     }
+    const returnMode = (leaf.view as { getMode?: () => string } | undefined)?.getMode?.() === "source"
+      ? "source"
+      : "preview";
     await leaf.setViewState(
       {
         type: ENHANCED_MARKDOWN_VIEW_TYPE,
         state: {
           file: sourcePath,
           mode,
+          returnMode,
           templateId: selection.templateId,
           themeId: selection.themeId
         }

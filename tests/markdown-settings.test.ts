@@ -44,7 +44,7 @@ describe("Markdown enhanced reading settings", () => {
     const tab = new HtmlPreviewSettingTab({} as never, plugin as never);
     tab.display();
     expect(tab.containerEl).toBeDefined();
-    expect(tab.containerEl.textContent).toContain("Folder template mappings");
+    expect(tab.containerEl.textContent).toContain("Open Markdown in Enhanced Preview by default");
     expect(tab.containerEl.querySelector("select[data-default-template]")).not.toBeNull();
     expect(tab.containerEl.querySelector("select[data-default-theme]")).not.toBeNull();
   });
