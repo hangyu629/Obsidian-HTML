@@ -26,5 +26,6 @@ describe("Markdown enhanced reading settings", () => {
     const tab = new HtmlPreviewSettingTab({} as never, plugin);
     tab.display();
     expect(tab.containerEl).toBeDefined();
+    expect(tab.containerEl.textContent).toContain("Folder template mappings");
   });
 });

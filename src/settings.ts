@@ -108,5 +108,60 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(this.containerEl)
+      .setName("Folder template mappings")
+      .setDesc("The most specific matching folder wins when a note has no frontmatter override.")
+      .addButton((button) =>
+        button
+          .setButtonText("Add mapping")
+          .onClick(async () => {
+            this.plugin.settings.folderMappings = [
+              ...this.plugin.settings.folderMappings,
+              { folder: "", templateId: "minimal", themeId: "light" }
+            ];
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    this.plugin.settings.folderMappings.forEach((mapping, index) => {
+      const update = async (changes: Partial<typeof mapping>): Promise<void> => {
+        this.plugin.settings.folderMappings = this.plugin.settings.folderMappings.map(
+          (current, currentIndex) =>
+            currentIndex === index ? { ...current, ...changes } : current
+        );
+        await this.plugin.saveSettings();
+      };
+      new Setting(this.containerEl)
+        .setName(`Folder mapping ${index + 1}`)
+        .addText((text) =>
+          text
+            .setValue(mapping.folder)
+            .setPlaceholder("Folder path")
+            .onChange((value) => update({ folder: value.trim() }))
+        )
+        .addText((text) =>
+          text
+            .setValue(mapping.templateId)
+            .setPlaceholder("Template id")
+            .onChange((value) => update({ templateId: value.trim() }))
+        )
+        .addText((text) =>
+          text
+            .setValue(mapping.themeId ?? "")
+            .setPlaceholder("Theme id")
+            .onChange((value) => update({ themeId: value.trim() || undefined }))
+        )
+        .addExtraButton((button) =>
+          button.setIcon("trash").setTooltip("Remove mapping").onClick(async () => {
+            this.plugin.settings.folderMappings = this.plugin.settings.folderMappings.filter(
+              (_current, currentIndex) => currentIndex !== index
+            );
+            await this.plugin.saveSettings();
+            this.display();
+          })
+        );
+    });
   }
 }

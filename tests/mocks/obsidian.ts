@@ -169,13 +169,30 @@ export class PluginSettingTab extends Component {
   containerEl = document.createElement("div");
 }
 export class Setting {
-  constructor(_container: HTMLElement) {}
-  setName(_name: string): this { return this; }
+  private readonly element: HTMLElement;
+  constructor(container: HTMLElement) {
+    this.element = document.createElement("div");
+    container.append(this.element);
+  }
+  setName(name: string): this {
+    const label = document.createElement("span");
+    label.className = "setting-name";
+    label.textContent = name;
+    this.element.append(label);
+    return this;
+  }
   setDesc(_description: string): this { return this; }
   addToggle(callback: (toggle: this) => unknown): this { callback(this); return this; }
   setValue(_value: unknown): this { return this; }
+  setPlaceholder(_value: string): this { return this; }
   onChange(_callback: (value: unknown) => unknown): this { return this; }
   addText(callback: (text: this) => unknown): this { callback(this); return this; }
+  addButton(callback: (button: this) => unknown): this { callback(this); return this; }
+  addExtraButton(callback: (button: this) => unknown): this { callback(this); return this; }
+  setButtonText(_text: string): this { return this; }
+  setIcon(_icon: string): this { return this; }
+  setTooltip(_tooltip: string): this { return this; }
+  onClick(_callback: () => unknown): this { return this; }
 }
 
 export class Notice {
