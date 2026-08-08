@@ -19,6 +19,22 @@ export class Component {
       cleanup();
     }
   }
+
+  unload(): void {
+    this.onunload();
+  }
+}
+
+export class MarkdownRenderer {
+  static async render(
+    _app: unknown,
+    markdown: string,
+    element: HTMLElement,
+    _sourcePath: string,
+    _component: Component
+  ): Promise<void> {
+    element.textContent = markdown;
+  }
 }
 
 export class TFile {
@@ -36,6 +52,8 @@ export class TFile {
 
 export class WorkspaceLeaf {
   constructor(public app: unknown) {}
+
+  async setViewState(): Promise<void> {}
 }
 
 export class ItemView extends Component {
