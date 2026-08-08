@@ -44,17 +44,19 @@ function harness(
   };
   const leaf = Object.assign(Object.create(WorkspaceLeaf.prototype), { app });
   const coordinator = new PreviewCoordinator(0);
+  const onReturnToMarkdown = vi.fn();
   const view = new EnhancedMarkdownView(leaf, {
     coordinator,
     getFrontmatter: () => ({}),
     loadTemplate: vi.fn(async () => template()),
     resolveAsset: (path) => `app://vault/${path}`,
     resolveTemplate,
+    onReturnToMarkdown,
     onSwitchTemplate: vi.fn()
   });
   document.body.append(view.containerEl);
   view.onload();
-  return { app, coordinator, leaf, resolveTemplate, view };
+  return { app, coordinator, leaf, onReturnToMarkdown, resolveTemplate, view };
 }
 
 interface MockViewAction {
@@ -113,7 +115,7 @@ describe("EnhancedMarkdownView", () => {
   });
 
   it("switches the current leaf to the native Markdown view with history", async () => {
-    const { leaf, view } = harness();
+    const { leaf, onReturnToMarkdown, view } = harness();
     await view.onLoadFile(file("notes/example.md"));
     const setViewState = vi.spyOn(leaf, "setViewState");
     await view.openNativeMarkdown();
@@ -122,10 +124,11 @@ describe("EnhancedMarkdownView", () => {
       { state: { file: "notes/example.md", mode: "source" }, type: "markdown" },
       { history: true }
     );
+    expect(onReturnToMarkdown).toHaveBeenCalledOnce();
   });
 
   it("switches the current leaf to native Markdown preview mode", async () => {
-    const { leaf, view } = harness();
+    const { leaf, onReturnToMarkdown, view } = harness();
     await view.onLoadFile(file("notes/example.md"));
     const setViewState = vi.spyOn(leaf, "setViewState");
 
@@ -135,6 +138,7 @@ describe("EnhancedMarkdownView", () => {
       { state: { file: "notes/example.md", mode: "preview" }, type: "markdown" },
       { history: true }
     );
+    expect(onReturnToMarkdown).toHaveBeenCalledOnce();
   });
 
   it("cleans the rendered DOM and coordinator subscription on unload", async () => {

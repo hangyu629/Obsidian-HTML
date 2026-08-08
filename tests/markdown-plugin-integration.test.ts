@@ -30,6 +30,7 @@ function appHarness() {
       getResourcePath: vi.fn((file: TFile) => `app://vault/${file.path}`)
     },
     workspace: {
+      activeLeaf: null as unknown,
       on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
         events.set(name, callback);
         return { name };
@@ -60,5 +61,39 @@ describe("Markdown plugin integration", () => {
       "magazine-research"
     ]);
     expect(MARKDOWN_TEMPLATE_ROOT).toBe(".html-preview/markdown-templates");
+  });
+
+  it("does not reopen enhanced reading after the user returns to native Markdown", async () => {
+    const { app } = appHarness();
+    const leaf = {
+      setViewState: vi.fn(async () => undefined),
+      view: Object.assign(Object.create(Object.prototype), {
+        file: Object.assign(Object.create(TFile.prototype), {
+          basename: "Note", extension: "md", name: "Note.md", path: "notes/Note.md"
+        }),
+        getViewType: () => "markdown"
+      })
+    };
+    app.workspace.activeLeaf = leaf;
+    const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
+    await plugin.onload();
+    const environment = (plugin as unknown as { registeredViews: Map<string, (leaf: unknown) => unknown> })
+      .registeredViews.get(ENHANCED_MARKDOWN_VIEW_TYPE);
+    const enhanced = environment?.(leaf) as {
+      onload(): void;
+      onLoadFile(file: TFile): Promise<void>;
+      openNativeMarkdown(): Promise<void>;
+    };
+    enhanced.onload();
+    await enhanced.onLoadFile(leaf.view.file);
+
+    await enhanced.openNativeMarkdown();
+    await (plugin as unknown as { maybeAutoOpen(leaf: unknown): Promise<void> }).maybeAutoOpen(leaf);
+
+    expect(leaf.setViewState).toHaveBeenCalledTimes(1);
+    expect(leaf.setViewState).toHaveBeenCalledWith(
+      { state: { file: "notes/Note.md", mode: "source" }, type: "markdown" },
+      { history: true }
+    );
   });
 });

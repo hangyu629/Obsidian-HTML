@@ -34,6 +34,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   private readonly knownVaultPaths = new Set<string>();
   private markdownTemplateIds = new Set(["book-editorial"]);
   private readonly enhancedLeaves = new WeakSet<object>();
+  private readonly nativeMarkdownPaths = new WeakMap<object, string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -60,6 +61,9 @@ export default class HtmlPreviewPlugin extends Plugin {
           getFrontmatter: (file) =>
             this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {},
           loadTemplate: (templateId) => this.markdownTemplateCatalog.load(templateId),
+          onReturnToMarkdown: (path) => {
+            this.nativeMarkdownPaths.set(leaf, path);
+          },
           onSwitchTemplate: (path) => {
             this.openTemplateChooser(path);
           },
@@ -221,6 +225,8 @@ export default class HtmlPreviewPlugin extends Plugin {
     }
     const file = leaf.view.file;
     if (!(file instanceof TFile)) return;
+    if (this.nativeMarkdownPaths.get(leaf) === file.path) return;
+    this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
     const selection = resolveMarkdownTemplate(
       file.path,
@@ -253,6 +259,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   ): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(sourcePath);
     if (!(file instanceof TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
+    this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
     const selection = selected
       ? { source: "default" as const, ...selected }

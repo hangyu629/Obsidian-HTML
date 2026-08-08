@@ -11,6 +11,7 @@ export interface EnhancedMarkdownViewEnvironment {
   coordinator: PreviewCoordinator;
   getFrontmatter(file: TFile): unknown;
   loadTemplate(templateId: string): Promise<MarkdownTemplatePackage>;
+  onReturnToMarkdown?(sourcePath: string): void;
   onSwitchTemplate?(sourcePath: string): void | Promise<void>;
   resolveAsset?(vaultPath: string): string | null;
   resolveTemplate(
@@ -122,6 +123,7 @@ export class EnhancedMarkdownView extends FileView {
 
   async openNativeMarkdown(): Promise<void> {
     if (!this.file) return;
+    this.environment.onReturnToMarkdown?.(this.file.path);
     await this.leaf.setViewState(
       { type: "markdown", state: { file: this.file.path, mode: "source" } },
       { history: true }
@@ -130,6 +132,7 @@ export class EnhancedMarkdownView extends FileView {
 
   async openMarkdownPreview(): Promise<void> {
     if (!this.file) return;
+    this.environment.onReturnToMarkdown?.(this.file.path);
     await this.leaf.setViewState(
       { type: "markdown", state: { file: this.file.path, mode: "preview" } },
       { history: true }
