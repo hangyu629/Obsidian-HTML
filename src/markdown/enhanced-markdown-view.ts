@@ -1,5 +1,18 @@
 import { Component, FileView, TFile, type WorkspaceLeaf } from "obsidian";
 
+import type { AnnotationService } from "../annotations/annotation-service";
+import {
+  AnnotationContextualUi,
+  type AnnotationDraft
+} from "../annotations/contextual-ui";
+import {
+  annotationFromMark,
+  applyAnnotationHighlights,
+  captureAnnotationSelection,
+  focusAnnotationMark
+} from "../annotations/dom";
+import type { HtmlAnnotation } from "../annotations/types";
+import { createRenderId } from "../preview/bridge-script";
 import type { PreviewCoordinator } from "../preview/preview-coordinator";
 import type { MarkdownTemplatePackage } from "./templates/types";
 import type { TemplateResolutionMode, TemplateSelection } from "./rules";
@@ -8,7 +21,12 @@ import { renderEnhancedMarkdown } from "./render-document";
 export const ENHANCED_MARKDOWN_VIEW_TYPE = "enhanced-markdown";
 
 export interface EnhancedMarkdownViewEnvironment {
+  annotationService: Pick<
+    AnnotationService,
+    "load" | "registerView" | "remove" | "save" | "subscribe"
+  >;
   coordinator: PreviewCoordinator;
+  createAnnotationId?: () => string;
   getFrontmatter(file: TFile): unknown;
   loadTemplate(templateId: string): Promise<MarkdownTemplatePackage>;
   onReturnToMarkdown?(sourcePath: string): void;
@@ -19,6 +37,7 @@ export interface EnhancedMarkdownViewEnvironment {
     frontmatter: unknown,
     mode: TemplateResolutionMode
   ): TemplateSelection | null;
+  showNotice(message: string): void;
 }
 
 interface EnhancedMarkdownViewState {
@@ -32,6 +51,10 @@ interface EnhancedMarkdownViewState {
 let nextViewId = 0;
 
 export class EnhancedMarkdownView extends FileView {
+  private activeAnnotations: HtmlAnnotation[] = [];
+  private annotationSubscription: (() => void) | null = null;
+  private annotationUi: AnnotationContextualUi | null = null;
+  private annotationViewRegistration: (() => void) | null = null;
   private readonly viewId = `enhanced-markdown-${++nextViewId}`;
   private environmentSubscription: (() => void) | null = null;
   private renderComponent: Component | null = null;
@@ -96,11 +119,30 @@ export class EnhancedMarkdownView extends FileView {
     this.addAction("palette", "Template & theme", () => {
       if (this.file) void this.environment.onSwitchTemplate?.(this.file.path);
     });
+    this.annotationUi = new AnnotationContextualUi(this.contentEl, {
+      onDelete: (annotation) => this.deleteAnnotation(annotation),
+      onSave: (draft) => this.saveAnnotation(draft)
+    });
+    this.registerDomEvent(this.contentEl, "mouseup", (event) => {
+      if (!(event.target instanceof Element) ||
+        !event.target.closest(".annotation-contextual-surface")) {
+        this.showSelectionUi();
+      }
+    });
+    this.registerDomEvent(this.contentEl, "keyup", (event) => {
+      if (event.key === "Shift" || event.key.startsWith("Arrow")) {
+        this.showSelectionUi();
+      }
+    });
+    this.registerDomEvent(this.contentEl, "click", (event) => {
+      this.openExistingAnnotation(event);
+    });
   }
 
   async onLoadFile(file: TFile): Promise<void> {
     await super.onLoadFile(file);
     this.file = file;
+    this.annotationUi?.close();
     this.subscribe(file.path);
     await this.render();
   }
@@ -109,6 +151,12 @@ export class EnhancedMarkdownView extends FileView {
     this.renderToken += 1;
     this.environmentSubscription?.();
     this.environmentSubscription = null;
+    this.annotationSubscription?.();
+    this.annotationSubscription = null;
+    this.annotationViewRegistration?.();
+    this.annotationViewRegistration = null;
+    this.activeAnnotations = [];
+    this.annotationUi?.close();
     this.renderComponent?.unload();
     this.renderComponent = null;
     this.contentEl.replaceChildren();
@@ -119,6 +167,7 @@ export class EnhancedMarkdownView extends FileView {
   async onRename(file: TFile): Promise<void> {
     await super.onRename(file);
     this.file = file;
+    this.annotationUi?.close();
     this.subscribe(file.path);
     await this.render();
   }
@@ -136,6 +185,13 @@ export class EnhancedMarkdownView extends FileView {
     this.renderToken += 1;
     this.environmentSubscription?.();
     this.environmentSubscription = null;
+    this.annotationSubscription?.();
+    this.annotationSubscription = null;
+    this.annotationViewRegistration?.();
+    this.annotationViewRegistration = null;
+    this.activeAnnotations = [];
+    this.annotationUi?.destroy();
+    this.annotationUi = null;
     this.renderComponent?.unload();
     this.renderComponent = null;
     this.contentEl.replaceChildren();
@@ -144,6 +200,8 @@ export class EnhancedMarkdownView extends FileView {
 
   private subscribe(sourcePath: string): void {
     this.environmentSubscription?.();
+    this.annotationSubscription?.();
+    this.annotationViewRegistration?.();
     this.environmentSubscription = this.environment.coordinator.subscribe(
       this.viewId,
       sourcePath,
@@ -152,12 +210,23 @@ export class EnhancedMarkdownView extends FileView {
         void this.render();
       }
     );
+    this.annotationSubscription = this.environment.annotationService.subscribe(
+      sourcePath,
+      () => {
+        void this.render();
+      }
+    );
+    this.annotationViewRegistration = this.environment.annotationService.registerView({
+      sourcePath,
+      focusAnnotation: (id) => Promise.resolve(this.focusAnnotation(id))
+    });
   }
 
   private async render(): Promise<void> {
     const file = this.file;
     if (!file) return;
     const token = ++this.renderToken;
+    this.annotationUi?.close();
     const frontmatter = this.environment.getFrontmatter(file);
     const selection =
       this.sessionSelection ??
@@ -168,9 +237,10 @@ export class EnhancedMarkdownView extends FileView {
     }
 
     try {
-      const [source, template] = await Promise.all([
+      const [source, template, annotations] = await Promise.all([
         this.app.vault.cachedRead(file),
-        this.environment.loadTemplate(selection.templateId)
+        this.environment.loadTemplate(selection.templateId),
+        this.environment.annotationService.load(file.path)
       ]);
       if (token !== this.renderToken || this.file?.path !== file.path) return;
 
@@ -195,8 +265,13 @@ export class EnhancedMarkdownView extends FileView {
         component.unload();
         return;
       }
+      const content = root.querySelector('[data-slot="content"]');
+      if (content instanceof HTMLElement) {
+        applyAnnotationHighlights(content, annotations);
+      }
       this.renderComponent?.unload();
       this.renderComponent = component;
+      this.activeAnnotations = annotations;
       this.contentEl.replaceChildren(root);
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
     } catch (error) {
@@ -214,5 +289,86 @@ export class EnhancedMarkdownView extends FileView {
     state.className = "enhanced-markdown-state";
     state.textContent = message;
     this.contentEl.replaceChildren(state);
+  }
+
+  private contentRoot(): HTMLElement | null {
+    const content = this.contentEl.querySelector('[data-slot="content"]');
+    return content instanceof HTMLElement ? content : null;
+  }
+
+  private captureCurrentSelection(): AnnotationSelection | null {
+    const content = this.contentRoot();
+    return content
+      ? captureAnnotationSelection(content, window.getSelection())
+      : null;
+  }
+
+  focusAnnotation(id: string): boolean {
+    const content = this.contentRoot();
+    return content ? focusAnnotationMark(content, id) : false;
+  }
+
+  private showSelectionUi(): void {
+    const selection = this.captureCurrentSelection();
+    const nativeSelection = window.getSelection();
+    if (!selection || !nativeSelection || nativeSelection.rangeCount === 0) return;
+    const range = nativeSelection.getRangeAt(0);
+    const anchor = typeof range.getBoundingClientRect === "function"
+      ? range.getBoundingClientRect()
+      : new DOMRect();
+    this.annotationUi?.showSelection(selection, anchor);
+  }
+
+  private openExistingAnnotation(event: MouseEvent): void {
+    const content = this.contentRoot();
+    if (!content || event.target instanceof Element &&
+      event.target.closest(".annotation-contextual-surface")) return;
+    const id = annotationFromMark(content, event.target);
+    const annotation = this.activeAnnotations.find((item) => item.id === id);
+    if (!annotation) return;
+    const target = event.target instanceof Element
+      ? event.target.closest<HTMLElement>("mark[data-obsidian-html-preview-annotation]")
+      : null;
+    this.annotationUi?.showAnnotation(
+      annotation,
+      target?.getBoundingClientRect() ?? new DOMRect()
+    );
+  }
+
+  private async saveAnnotation(draft: AnnotationDraft): Promise<boolean> {
+    const sourcePath = this.file?.path;
+    if (!sourcePath) return false;
+    try {
+      await this.environment.annotationService.save(sourcePath, {
+        ...draft,
+        id: draft.id ?? this.environment.createAnnotationId?.() ?? createRenderId(),
+        sourcePath
+      });
+      window.getSelection()?.removeAllRanges();
+      this.environment.showNotice(draft.id ? "Annotation updated." : "Annotation added.");
+      return true;
+    } catch (error) {
+      this.environment.showNotice(
+        `Could not save annotation: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return false;
+    }
+  }
+
+  private async deleteAnnotation(annotation: HtmlAnnotation): Promise<boolean> {
+    try {
+      await this.environment.annotationService.remove(annotation);
+      this.environment.showNotice("Annotation deleted.");
+      return true;
+    } catch (error) {
+      this.environment.showNotice(
+        `Could not delete annotation: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return false;
+    }
   }
 }

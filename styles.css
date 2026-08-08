@@ -41,6 +41,283 @@
   text-align: center;
 }
 
+.enhanced-markdown-view mark[data-obsidian-html-preview-annotation] {
+  padding: 0 0.08em;
+  border-radius: 2px;
+  color: inherit;
+  cursor: pointer;
+  transition: box-shadow 160ms ease, filter 160ms ease;
+}
+
+.enhanced-markdown-view mark[data-obsidian-html-preview-annotation][data-annotation-color="yellow"] {
+  background: rgba(238, 199, 92, 0.42);
+}
+
+.enhanced-markdown-view mark[data-obsidian-html-preview-annotation][data-annotation-color="green"] {
+  background: rgba(104, 184, 126, 0.34);
+}
+
+.enhanced-markdown-view mark[data-obsidian-html-preview-annotation][data-annotation-color="blue"] {
+  background: rgba(91, 158, 204, 0.34);
+}
+
+.enhanced-markdown-view mark[data-obsidian-html-preview-annotation][data-annotation-color="pink"] {
+  background: rgba(213, 111, 137, 0.31);
+}
+
+.enhanced-markdown-view mark[data-obsidian-html-preview-annotation][data-annotation-color="violet"] {
+  background: rgba(146, 112, 193, 0.31);
+}
+
+.enhanced-markdown-view mark.is-annotation-focus {
+  box-shadow: 0 0 0 3px var(--background-primary),
+    0 0 0 5px var(--interactive-accent);
+  filter: saturate(1.12);
+}
+
+.view-content.enhanced-markdown-view,
+.view-content.enhanced-markdown-view [data-slot="content"],
+.view-content.enhanced-markdown-view [data-slot="content"] * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+.annotation-contextual-surface,
+.annotation-contextual-surface * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  letter-spacing: 0;
+}
+
+.annotation-contextual-surface {
+  position: fixed;
+  z-index: var(--layer-popover, 1000);
+  border: 1px solid var(--background-modifier-border-hover);
+  border-radius: 8px;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+  font-family: var(--font-interface);
+}
+
+.annotation-selection-toolbar {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  min-height: 38px;
+  padding: 4px;
+}
+
+.annotation-toolbar-button,
+.annotation-editor-close,
+.annotation-editor-delete,
+.annotation-editor-secondary,
+.annotation-editor-primary,
+.annotation-color-swatch {
+  box-shadow: none;
+}
+
+.annotation-toolbar-button {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-normal);
+  background: transparent;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.annotation-toolbar-button:hover {
+  background: var(--background-modifier-hover);
+}
+
+.annotation-toolbar-palette {
+  padding-left: 7px;
+  border-left: 1px solid var(--background-modifier-border);
+}
+
+.annotation-editor {
+  width: min(360px, calc(100vw - 16px));
+  overflow: hidden;
+  padding: 0;
+}
+
+.annotation-editor-header,
+.annotation-editor-actions,
+.annotation-editor-commands,
+.annotation-color-palette {
+  display: flex;
+  align-items: center;
+}
+
+.annotation-editor-header {
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 10px 6px 14px;
+}
+
+.annotation-editor-header strong {
+  font-size: var(--font-ui-small);
+  font-weight: 650;
+}
+
+.annotation-editor-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.annotation-editor-close:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.annotation-editor-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0 14px 12px;
+  padding: 1px 0 1px 10px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  border-left: 3px solid rgba(238, 199, 92, 0.72);
+  color: var(--text-muted);
+  font-family: var(--font-text);
+  font-size: var(--font-ui-smaller);
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.annotation-color-palette {
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+.annotation-toolbar-palette.annotation-color-palette {
+  padding: 0 4px 0 10px;
+}
+
+.annotation-color-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--background-primary);
+  border-radius: 50%;
+  outline: 1px solid var(--background-modifier-border-hover);
+  outline-offset: 0;
+}
+
+.annotation-color-swatch[data-color="yellow"] {
+  background: #e9c65d;
+}
+
+.annotation-color-swatch[data-color="green"] {
+  background: #74b985;
+}
+
+.annotation-color-swatch[data-color="blue"] {
+  background: #6aa6cb;
+}
+
+.annotation-color-swatch[data-color="pink"] {
+  background: #d77f97;
+}
+
+.annotation-color-swatch[data-color="violet"] {
+  background: #9980c2;
+}
+
+.annotation-color-swatch[aria-pressed="true"] {
+  outline: 2px solid var(--text-normal);
+  outline-offset: 1px;
+}
+
+.annotation-color-swatch:focus-visible,
+.annotation-contextual-surface button:focus-visible,
+.annotation-editor-comment:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.annotation-editor-comment {
+  display: block;
+  width: calc(100% - 28px);
+  min-height: 92px;
+  margin: 0 14px;
+  resize: vertical;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-normal);
+  background: var(--background-secondary);
+  padding: 10px 11px;
+  font-size: var(--font-ui-small);
+  line-height: 1.55;
+}
+
+.annotation-editor-comment:focus {
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+}
+
+.annotation-editor-actions {
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+.annotation-editor-commands {
+  gap: 7px;
+  margin-left: auto;
+}
+
+.annotation-editor-delete,
+.annotation-editor-secondary,
+.annotation-editor-primary {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+}
+
+.annotation-editor-delete {
+  padding-inline: 2px;
+  border: 0;
+  color: var(--text-error);
+  background: transparent;
+}
+
+.annotation-editor-secondary {
+  border: 1px solid var(--background-modifier-border-hover);
+  color: var(--text-normal);
+  background: var(--background-primary);
+}
+
+.annotation-editor-primary {
+  border: 1px solid var(--interactive-accent);
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+
+@media (max-width: 640px) {
+  .annotation-editor {
+    top: auto !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    left: 8px !important;
+    width: auto;
+  }
+}
+
 .enhanced-markdown-template-themes {
   display: flex;
   flex-wrap: wrap;
