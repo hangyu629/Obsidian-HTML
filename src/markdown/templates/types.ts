@@ -15,6 +15,7 @@ export interface MarkdownTemplateTheme {
 
 export interface MarkdownTemplateManifest {
   defaultTheme: string;
+  description?: string;
   id: string;
   name: string;
   themes: MarkdownTemplateTheme[];
@@ -37,9 +38,11 @@ export interface MarkdownTemplatePackage {
 
 export interface MarkdownTemplateSummary {
   defaultTheme: string;
+  description?: string;
   id: string;
   name: string;
   themeIds: string[];
+  themeNames?: Record<string, string>;
 }
 
 export interface TemplateLayoutResult {

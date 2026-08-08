@@ -189,6 +189,27 @@ export class Setting {
   setPlaceholder(_value: string): this { return this; }
   onChange(_callback: (value: unknown) => unknown): this { return this; }
   addText(callback: (text: this) => unknown): this { callback(this); return this; }
+  addDropdown(callback: (dropdown: { selectEl: HTMLSelectElement; addOption: (value: string, display: string) => unknown; setValue: (value: string) => unknown; onChange: (callback: (value: string) => unknown) => unknown }) => unknown): this {
+    const selectEl = document.createElement("select");
+    const dropdown = {
+      selectEl,
+      addOption: (value: string, display: string) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = display;
+        selectEl.append(option);
+      },
+      setValue: (value: string) => {
+        selectEl.value = value;
+      },
+      onChange: (change: (value: string) => unknown) => {
+        selectEl.addEventListener("change", () => void change(selectEl.value));
+      }
+    };
+    this.element.append(selectEl);
+    callback(dropdown);
+    return this;
+  }
   addButton(callback: (button: this) => unknown): this { callback(this); return this; }
   addExtraButton(callback: (button: this) => unknown): this { callback(this); return this; }
   setButtonText(_text: string): this { return this; }

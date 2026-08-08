@@ -31,10 +31,24 @@ export class MarkdownTemplateModal extends Modal {
       const fragment = document.createDocumentFragment();
       for (const template of templates) {
         const section = document.createElement("section");
-        section.className = "enhanced-markdown-template-option";
+        section.className = "enhanced-markdown-template-card";
+        section.dataset.templateId = template.id;
+        const header = document.createElement("div");
+        header.className = "enhanced-markdown-template-card-header";
         const heading = document.createElement("h3");
         heading.textContent = template.name;
-        section.append(heading);
+        header.append(heading);
+        const badge = document.createElement("span");
+        badge.className = "enhanced-markdown-template-badge";
+        badge.textContent = template.id === "book-editorial" ? "Built-in" : "Available";
+        header.append(badge);
+        section.append(header);
+        if (template.description) {
+          const description = document.createElement("p");
+          description.className = "enhanced-markdown-template-description";
+          description.textContent = template.description;
+          section.append(description);
+        }
         const themes = document.createElement("div");
         themes.className = "enhanced-markdown-template-themes";
         for (const themeId of template.themeIds) {
@@ -42,7 +56,8 @@ export class MarkdownTemplateModal extends Modal {
           button.type = "button";
           button.dataset.templateId = template.id;
           button.dataset.themeId = themeId;
-          button.textContent = themeId;
+          button.textContent = template.themeNames?.[themeId] ?? themeId;
+          button.title = `Use ${template.name} with ${button.textContent}`;
           button.addEventListener("click", () => {
             this.environment.onSelect({ templateId: template.id, themeId });
             this.close();

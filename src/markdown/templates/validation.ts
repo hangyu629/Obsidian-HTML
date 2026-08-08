@@ -93,6 +93,7 @@ export function parseTemplateManifest(
   }
   return {
     defaultTheme: value.defaultTheme,
+    description: typeof value.description === "string" ? value.description : undefined,
     id: value.id,
     name: value.name,
     themes,

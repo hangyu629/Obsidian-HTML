@@ -7,13 +7,23 @@ describe("MarkdownTemplateModal", () => {
     const onSelect = vi.fn();
     const modal = new MarkdownTemplateModal({} as never, {
       list: vi.fn(async () => [
-        { defaultTheme: "light", id: "book-editorial", name: "Book Editorial", themeIds: ["light", "dark"] }
+        {
+          defaultTheme: "light",
+          description: "Book-like single-column reading with a paper editorial cover.",
+          id: "book-editorial",
+          name: "Book Editorial",
+          themeIds: ["light", "dark"],
+          themeNames: { light: "Light paper", dark: "Dark forest" }
+        }
       ]),
       onSelect
     });
 
     modal.open();
     await Promise.resolve();
+    expect(modal.contentEl.querySelector(".enhanced-markdown-template-card")).not.toBeNull();
+    expect(modal.contentEl.textContent).toContain("Book-like single-column reading");
+    expect(modal.contentEl.textContent).toContain("Dark forest");
     await Promise.resolve();
     const button = modal.contentEl.querySelector("button[data-template-id=book-editorial][data-theme-id=dark]");
     expect(button).not.toBeNull();

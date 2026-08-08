@@ -93,31 +93,10 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
           })
       );
 
-    new Setting(this.containerEl)
-      .setName("Default Markdown template")
-      .setDesc("Used when opening enhanced reading manually without a matching rule.")
-      .addText((text) =>
-        text
-          .setValue(this.plugin.settings.defaultTemplateId)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultTemplateId =
-              normalizeTemplateId(value.trim()) || "book-editorial";
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(this.containerEl)
-      .setName("Default Markdown theme")
-      .addText((text) =>
-        text
-          .setValue(this.plugin.settings.defaultThemeId)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultThemeId = value.trim() || "light";
-            await this.plugin.saveSettings();
-          })
-      );
-
     const templates = this.plugin.listMarkdownTemplates();
+    this.addDefaultTemplateSetting(templates);
+    this.addDefaultThemeSetting(templates);
+
     new Setting(this.containerEl)
       .setName("Folder template mappings")
       .setDesc("The most specific matching folder wins when a note has no frontmatter override.")
@@ -150,11 +129,14 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
       };
       const row = new Setting(this.containerEl)
         .setName(`Folder mapping ${index + 1}`)
-        .addText((text) =>
-          text
-            .setValue(mapping.folder)
-            .setPlaceholder("Folder path")
-            .onChange((value) => update({ folder: value.trim() }))
+        .addDropdown((dropdown) => {
+          dropdown.addOption("", "Vault root");
+          for (const folder of this.plugin.listMarkdownFolders()) {
+            dropdown.addOption(folder, folder);
+          }
+          dropdown.setValue(mapping.folder);
+          dropdown.onChange((value) => void update({ folder: value }));
+        }
         )
         .addExtraButton((button) =>
           button.setIcon("trash").setTooltip("Remove mapping").onClick(async () => {
@@ -166,6 +148,43 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
           })
         );
       this.addFolderTemplateSelectors(row.settingEl, mapping, templates, update);
+    });
+  }
+
+  private addDefaultTemplateSetting(templates: readonly MarkdownTemplateSummary[]): void {
+    const setting = new Setting(this.containerEl)
+      .setName("Default Markdown template")
+      .setDesc("Used when opening enhanced reading manually without a matching rule.");
+    setting.addDropdown((dropdown) => {
+      for (const template of templates) dropdown.addOption(template.id, template.name);
+      dropdown.setValue(this.plugin.settings.defaultTemplateId);
+      dropdown.onChange(async (value) => {
+        const template = templates.find((item) => item.id === value);
+        if (!template) return;
+        this.plugin.settings.defaultTemplateId = template.id;
+        this.plugin.settings.defaultThemeId = template.defaultTheme;
+        await this.plugin.saveSettings();
+        this.display();
+      });
+      dropdown.selectEl.dataset.defaultTemplate = "true";
+    });
+  }
+
+  private addDefaultThemeSetting(templates: readonly MarkdownTemplateSummary[]): void {
+    const selected = templates.find((template) => template.id === this.plugin.settings.defaultTemplateId);
+    const setting = new Setting(this.containerEl).setName("Default Markdown theme");
+    setting.addDropdown((dropdown) => {
+      for (const themeId of selected?.themeIds ?? ["light"]) {
+        dropdown.addOption(themeId, selected?.themeNames?.[themeId] ?? themeId);
+      }
+      dropdown.setValue(selected?.themeIds.includes(this.plugin.settings.defaultThemeId)
+        ? this.plugin.settings.defaultThemeId
+        : selected?.defaultTheme ?? "light");
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.defaultThemeId = value;
+        await this.plugin.saveSettings();
+      });
+      dropdown.selectEl.dataset.defaultTheme = "true";
     });
   }
 
@@ -207,7 +226,7 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
     for (const themeId of selectedTemplate.themeIds) {
       const option = document.createElement("option");
       option.value = themeId;
-      option.textContent = themeId;
+      option.textContent = selectedTemplate.themeNames?.[themeId] ?? themeId;
       themeSelect.append(option);
     }
     themeSelect.value = selectedTemplate.themeIds.includes(mapping.themeId ?? "")

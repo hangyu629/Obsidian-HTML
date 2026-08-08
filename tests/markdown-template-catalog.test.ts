@@ -57,21 +57,27 @@ describe("MarkdownTemplateCatalog", () => {
     expect(await catalog.list()).toEqual([
       {
         defaultTheme: "light",
+        description: "Book-like single-column reading with a paper editorial cover.",
         id: BUILT_IN_TEMPLATE_ID,
         name: "Book Editorial",
-        themeIds: ["light", "dark"]
+        themeIds: ["light", "dark"],
+        themeNames: { light: "Light paper", dark: "Dark forest" }
       },
       {
         defaultTheme: "light",
+        description: "Wide research-report reading with a navy masthead and coral accents.",
         id: "magazine-research",
         name: "Magazine Research",
-        themeIds: ["light", "dark"]
+        themeIds: ["light", "dark"],
+        themeNames: { light: "Light paper", dark: "Dark report" }
       },
       {
         defaultTheme: "light",
+        description: undefined,
         id: "editorial",
         name: "Editorial",
-        themeIds: ["light"]
+        themeIds: ["light"],
+        themeNames: { light: "Light" }
       }
     ]);
   });

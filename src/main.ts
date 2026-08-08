@@ -180,6 +180,14 @@ export default class HtmlPreviewPlugin extends Plugin {
     return this.markdownTemplates;
   }
 
+  listMarkdownFolders(): readonly string[] {
+    return this.app.vault
+      .getAllFolders()
+      .map((folder: { path: string }) => folder.path)
+      .filter((path: string) => path.length > 0)
+      .sort((left: string, right: string) => left.localeCompare(right));
+  }
+
   refreshOpenPreviews(): void {
     for (const file of this.app.vault.getFiles()) {
       if (file.extension === "html" || file.extension === "htm") {

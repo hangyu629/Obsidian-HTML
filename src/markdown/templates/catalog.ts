@@ -36,9 +36,13 @@ export class MarkdownTemplateCatalog {
   async list(): Promise<MarkdownTemplateSummary[]> {
     const summaries: MarkdownTemplateSummary[] = BUILT_IN_TEMPLATES.map((template) => ({
       defaultTheme: template.manifest.defaultTheme,
+      description: template.manifest.description,
       id: template.manifest.id,
       name: template.manifest.name,
-      themeIds: template.manifest.themes.map((theme) => theme.id)
+      themeIds: template.manifest.themes.map((theme) => theme.id),
+      themeNames: Object.fromEntries(
+        template.manifest.themes.map((theme) => [theme.id, theme.name])
+      )
     }));
     const root = `${MARKDOWN_TEMPLATE_ROOT}/`;
     let listing: { files: string[]; folders: string[] };
@@ -61,9 +65,13 @@ export class MarkdownTemplateCatalog {
       }
       summaries.push({
         defaultTheme: packageValue.manifest.defaultTheme,
+        description: packageValue.manifest.description,
         id,
         name: packageValue.manifest.name,
-        themeIds: packageValue.manifest.themes.map((theme) => theme.id)
+        themeIds: packageValue.manifest.themes.map((theme) => theme.id),
+        themeNames: Object.fromEntries(
+          packageValue.manifest.themes.map((theme) => [theme.id, theme.name])
+        )
       });
     }
     return summaries;
