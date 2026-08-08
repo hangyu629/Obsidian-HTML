@@ -48,7 +48,9 @@ describe("HtmlAnnotationStore", () => {
     await store.addFileAnnotation("pages/index.html", annotation);
 
     expect(adapter.files.has(annotationPagePath("pages/index.html"))).toBe(true);
-    expect(await store.load("pages/index.html")).toEqual([annotation]);
+    expect(await store.load("pages/index.html")).toEqual([
+      { ...annotation, color: "yellow" }
+    ]);
   });
 
   it("removes individual annotations without touching other entries", async () => {
@@ -73,6 +75,60 @@ describe("HtmlAnnotationStore", () => {
 
     await store.removeAnnotation(second);
 
-    expect(await store.load("pages/index.html")).toEqual([first]);
+    expect(await store.load("pages/index.html")).toEqual([
+      { ...first, color: "yellow" }
+    ]);
+  });
+
+  it("stores highlight-only annotations and updates an existing id", async () => {
+    const adapter = new MemoryAdapter();
+    const store = new HtmlAnnotationStore(adapter);
+    const annotation = {
+      color: "blue" as const,
+      comment: "",
+      id: "11111111111111111111111111111111",
+      quote: "Alpha",
+      sourcePath: "pages/index.html",
+      target: { end: 5, exact: "Alpha", prefix: "", start: 0, suffix: " beta" }
+    };
+
+    await store.saveFileAnnotation("pages/index.html", annotation);
+    await store.saveFileAnnotation("pages/index.html", {
+      ...annotation,
+      color: "pink"
+    });
+
+    expect(await store.load("pages/index.html")).toEqual([
+      { ...annotation, color: "pink" }
+    ]);
+  });
+
+  it("rejects a document containing an unknown annotation color", async () => {
+    const adapter = new MemoryAdapter();
+    const store = new HtmlAnnotationStore(adapter);
+    adapter.files.set(
+      annotationPagePath("pages/index.html"),
+      JSON.stringify({
+        annotations: [
+          {
+            color: "orange",
+            comment: "invalid",
+            id: "11111111111111111111111111111111",
+            quote: "Alpha",
+            sourcePath: "pages/index.html",
+            target: {
+              end: 5,
+              exact: "Alpha",
+              prefix: "",
+              start: 0,
+              suffix: " beta"
+            }
+          }
+        ],
+        version: 1
+      })
+    );
+
+    expect(await store.load("pages/index.html")).toEqual([]);
   });
 });

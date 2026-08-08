@@ -1,4 +1,8 @@
-import type { HtmlAnnotation, HtmlAnnotationDocument } from "./types";
+import {
+  annotationColor,
+  type HtmlAnnotation,
+  type HtmlAnnotationDocument
+} from "./types";
 
 export interface AnnotationStorageAdapter {
   exists(path: string): Promise<boolean>;
@@ -34,6 +38,7 @@ function isAnnotation(value: unknown): value is HtmlAnnotation {
     typeof candidate.comment === "string" &&
     typeof candidate.quote === "string" &&
     typeof candidate.sourcePath === "string" &&
+    (candidate.color === undefined || annotationColor(candidate.color) !== null) &&
     typeof target === "object" &&
     target !== null &&
     !Array.isArray(target) &&
@@ -50,7 +55,13 @@ function parseDocument(value: unknown): HtmlAnnotationDocument | null {
   const candidate = value as Record<string, unknown>;
   if (candidate.version !== 1 || !Array.isArray(candidate.annotations)) return null;
   if (!candidate.annotations.every(isAnnotation)) return null;
-  return { annotations: candidate.annotations, version: 1 };
+  return {
+    annotations: candidate.annotations.map((annotation) => ({
+      ...annotation,
+      color: annotation.color ?? "yellow"
+    })),
+    version: 1
+  };
 }
 
 function serialize(annotations: readonly HtmlAnnotation[]): string {
@@ -73,6 +84,10 @@ export class HtmlAnnotationStore {
   }
 
   addFileAnnotation(sourcePath: string, annotation: HtmlAnnotation): Promise<void> {
+    return this.saveFileAnnotation(sourcePath, annotation);
+  }
+
+  saveFileAnnotation(sourcePath: string, annotation: HtmlAnnotation): Promise<void> {
     validateSourcePath(sourcePath);
     return this.mutate(async () => {
       const path = annotationPagePath(sourcePath);
