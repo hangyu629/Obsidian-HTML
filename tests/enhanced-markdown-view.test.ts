@@ -76,7 +76,7 @@ describe("EnhancedMarkdownView", () => {
       "# Note"
     );
     expect(actions(view).map((action) => action.title)).toEqual(
-      expect.arrayContaining(["Open native Markdown", "Switch template"])
+      expect.arrayContaining(["Source", "Preview", "Template & theme"])
     );
   });
 
@@ -107,7 +107,7 @@ describe("EnhancedMarkdownView", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(read).toHaveBeenCalled();
 
-    const nativeAction = actions(view).find((action) => action.title === "Open native Markdown");
+    const nativeAction = actions(view).find((action) => action.title === "Source");
     await nativeAction?.callback(new MouseEvent("click"));
     expect(vi.spyOn(leaf, "setViewState")).not.toHaveBeenCalled();
   });
@@ -119,7 +119,20 @@ describe("EnhancedMarkdownView", () => {
     await view.openNativeMarkdown();
 
     expect(setViewState).toHaveBeenCalledWith(
-      { state: { file: "notes/example.md" }, type: "markdown" },
+      { state: { file: "notes/example.md", mode: "source" }, type: "markdown" },
+      { history: true }
+    );
+  });
+
+  it("switches the current leaf to native Markdown preview mode", async () => {
+    const { leaf, view } = harness();
+    await view.onLoadFile(file("notes/example.md"));
+    const setViewState = vi.spyOn(leaf, "setViewState");
+
+    await view.openMarkdownPreview();
+
+    expect(setViewState).toHaveBeenCalledWith(
+      { state: { file: "notes/example.md", mode: "preview" }, type: "markdown" },
       { history: true }
     );
   });

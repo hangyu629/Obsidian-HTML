@@ -40,7 +40,7 @@ Restart Obsidian, open **Settings -> Community plugins**, and enable **HTML Prev
 
 ## Enhanced Markdown Reading
 
-Enhanced reading keeps the normal Markdown editor and source file intact. Use the **Enhanced reading** command or the book action on a Markdown view to open a rendered page. The renderer is Obsidian's native `MarkdownRenderer`, so core headings, lists, tables, tasks, callouts, code, math, links, embeds, Properties, and footnotes retain Obsidian behavior. Use **Open native Markdown** to return to the normal view.
+Enhanced reading keeps the normal Markdown editor and source file intact. Use the **Enhanced reading** action from either Markdown source mode or native Markdown preview mode to open a rendered page. In enhanced reading, **Source** returns to Markdown source mode, **Preview** returns to native Markdown preview mode, and **Template & theme** changes the current template without splitting the page or opening another tab. The renderer is Obsidian's native `MarkdownRenderer`, so core headings, lists, tables, tasks, callouts, code, math, links, embeds, Properties, and footnotes retain Obsidian behavior.
 
 The built-in **Book Editorial** template is the default. It uses a book-like single-column layout, an editorial cover, paper-toned light and dark themes, and dedicated presentation for Properties, the table of contents, quotes, Callouts, tables, code, task lists, math, embeds, and footnotes. **Magazine Research** is also available as a built-in option: it uses a navy editorial masthead, coral and sage accents, a combined Contents/Properties band, and a wide research-report reading column.
 
@@ -123,7 +123,7 @@ Fixtures for manual Vault smoke testing are in `tests/fixtures/`.
 
 清理功能依赖 **Allow page JavaScript**；关闭此设置后不会应用规则，也不能选择元素。跨域 iframe、canvas、视频或图片内部的内容不能单独选择，只能隐藏它们的外层元素。
 
-增强 Markdown 阅读不会改变 `.md` 源文件。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 **设置 → Folder template mappings** 中按 Vault 文件夹选择模板和主题；子文件夹继承规则，最具体的文件夹优先。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
+增强 Markdown 阅读不会改变 `.md` 源文件。源码模式和 Obsidian 原生预览模式都可以点击 **Enhanced reading** 进入增强阅读；进入后，右上角的 **Source**、**Preview** 可以直接切回对应模式，**Template & theme** 可以切换当前模板，不会分屏或新开标签。可以在设置中启用自动增强阅读、指定默认模板/主题，并在 **设置 → Folder template mappings** 中按 Vault 文件夹选择模板和主题；子文件夹继承规则，最具体的文件夹优先。frontmatter 优先于文件夹映射；没有匹配规则时，手动打开使用全局默认模板。模板只允许 HTML、CSS、主题和本地资源，不执行模板 JavaScript；Markdown 仍由 Obsidian 原生渲染器处理。
 
 内置默认模板为 **Book Editorial**：它采用书籍式单栏、封面标题区和浅色/深色纸张主题，并专门处理 Properties、目录、引用、Callout、表格、代码、任务、数学公式、嵌入与脚注。
 

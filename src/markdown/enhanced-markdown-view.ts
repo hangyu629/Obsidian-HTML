@@ -84,10 +84,13 @@ export class EnhancedMarkdownView extends FileView {
   onload(): void {
     super.onload();
     this.contentEl.classList.add("enhanced-markdown-view");
-    this.addAction("file-text", "Open native Markdown", () => {
+    this.addAction("file-text", "Source", () => {
       void this.openNativeMarkdown();
     });
-    this.addAction("palette", "Switch template", () => {
+    this.addAction("book-open", "Preview", () => {
+      void this.openMarkdownPreview();
+    });
+    this.addAction("palette", "Template & theme", () => {
       if (this.file) void this.environment.onSwitchTemplate?.(this.file.path);
     });
   }
@@ -120,7 +123,15 @@ export class EnhancedMarkdownView extends FileView {
   async openNativeMarkdown(): Promise<void> {
     if (!this.file) return;
     await this.leaf.setViewState(
-      { type: "markdown", state: { file: this.file.path } },
+      { type: "markdown", state: { file: this.file.path, mode: "source" } },
+      { history: true }
+    );
+  }
+
+  async openMarkdownPreview(): Promise<void> {
+    if (!this.file) return;
+    await this.leaf.setViewState(
+      { type: "markdown", state: { file: this.file.path, mode: "preview" } },
       { history: true }
     );
   }
