@@ -7,7 +7,6 @@ const MAX_FALLBACK_CANDIDATES = 500;
 function normalizeText(value: string | null): string {
   return (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
 }
-
 function classOverlap(actual: DOMTokenList, expected: readonly string[]): number {
   if (expected.length === 0) {
     return 0;
@@ -137,4 +136,3 @@ export function resolveCleanupRule(
     rule.scope === "folder" ? 0.75 : 0.62
   );
 }
-

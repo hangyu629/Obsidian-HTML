@@ -4,6 +4,8 @@ export const CLEANUP_HIDDEN_ATTRIBUTE = "data-obsidian-html-preview-hidden";
 export const CLEANUP_TARGET_ATTRIBUTE = "data-obsidian-html-preview-target";
 export const CLEANUP_MODE_MESSAGE_TYPE =
   "obsidian-html-preview:cleanup-mode" as const;
+export const CLEANUP_MODE_STATE_MESSAGE_TYPE =
+  "obsidian-html-preview:cleanup-mode-state" as const;
 export const CLEANUP_SELECTED_MESSAGE_TYPE =
   "obsidian-html-preview:cleanup-selected" as const;
 export const CLEANUP_UNMATCHED_MESSAGE_TYPE =
@@ -133,6 +135,7 @@ export function installCleanupRuntime(
   const targetAttribute = "data-obsidian-html-preview-target";
   const uiAttribute = "data-html-preview-cleanup-ui";
   const modeMessageType = "obsidian-html-preview:cleanup-mode";
+  const modeStateMessageType = "obsidian-html-preview:cleanup-mode-state";
   const selectedMessageType = "obsidian-html-preview:cleanup-selected";
   const unmatchedMessageType = "obsidian-html-preview:cleanup-unmatched";
   const cachedStopImmediate = Event.prototype.stopImmediatePropagation;
@@ -335,6 +338,14 @@ export function installCleanupRuntime(
       cleanupMode = false;
       clearTarget();
       removeControls();
+      window.parent.postMessage(
+        {
+          enabled: false,
+          renderId: config.renderId,
+          type: modeStateMessageType
+        },
+        "*"
+      );
     }
   };
 

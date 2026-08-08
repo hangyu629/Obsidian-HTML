@@ -10,7 +10,6 @@ export const validCandidate: CleanupCandidate = {
     text: "Related articles"
   }
 };
-
 export const validRule: CleanupRule = {
   ...validCandidate,
   createdAt: "2026-08-07T12:00:00.000Z",
@@ -18,4 +17,3 @@ export const validRule: CleanupRule = {
   scope: "file",
   sourcePath: "Clippings/page.html"
 };
-

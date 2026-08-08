@@ -112,6 +112,24 @@ describe("cleanup runtime", () => {
     dispose();
   });
 
+  it("reports that Escape exited cleanup mode", () => {
+    const postMessage = vi.spyOn(window.parent, "postMessage");
+    const dispose = installCleanupRuntime({ renderId: "secret", rules: [] });
+    window.dispatchEvent(cleanupCommand(true));
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+    expect(postMessage).toHaveBeenCalledWith(
+      {
+        enabled: false,
+        renderId: "secret",
+        type: "obsidian-html-preview:cleanup-mode-state"
+      },
+      "*"
+    );
+    dispose();
+  });
+
   it("rejects synthetic cleanup clicks and intercepts them before navigation", () => {
     const postMessage = vi.spyOn(window.parent, "postMessage");
     document.body.innerHTML = `<a class="sidebar" href="next.html">Next</a>`;

@@ -1,5 +1,6 @@
-import { Plugin, TFile } from "obsidian";
+import { Notice, Plugin, TFile } from "obsidian";
 
+import { CleanupRuleStore } from "./cleanup/rule-store";
 import {
   HtmlPreviewView,
   HTML_PREVIEW_VIEW_TYPE
@@ -13,22 +14,33 @@ import {
 
 export default class HtmlPreviewPlugin extends Plugin {
   readonly coordinator = new PreviewCoordinator();
+  cleanupStore!: CleanupRuleStore;
   settings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   private readonly knownVaultPaths = new Set<string>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
     this.rebuildPathIndex();
+    this.cleanupStore = new CleanupRuleStore(
+      this.app.vault.adapter,
+      ({ message, path }) => {
+        new Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
+      }
+    );
 
     this.registerView(
       HTML_PREVIEW_VIEW_TYPE,
       (leaf) =>
         new HtmlPreviewView(leaf, {
+          cleanupStore: this.cleanupStore,
           coordinator: this.coordinator,
           getKnownVaultPaths: () => this.knownVaultPaths,
           getSettings: () => this.settings,
           openExternal: (url) => {
             window.open(url, "_blank", "noopener,noreferrer");
+          },
+          showNotice: (message) => {
+            new Notice(message);
           }
         })
     );
@@ -65,6 +77,12 @@ export default class HtmlPreviewPlugin extends Plugin {
         if (file instanceof TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
+          if (isHtmlPath(oldPath) || isHtmlPath(file.path)) {
+            void this.cleanupStore.migrateFile(oldPath, file.path).catch((error) => {
+              const detail = error instanceof Error ? error.message : String(error);
+              new Notice(`Could not migrate HTML cleanup rules: ${detail}`);
+            });
+          }
         }
       })
     );
@@ -99,3 +117,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   }
 }
 
+function isHtmlPath(path: string): boolean {
+  const extension = path.slice(path.lastIndexOf(".") + 1).toLowerCase();
+  return extension === "html" || extension === "htm";
+}

@@ -21,7 +21,7 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
     new Setting(this.containerEl)
       .setName("Allow page JavaScript")
       .setDesc(
-        "Enabled by default. Scripts run in an isolated frame but can still make network requests."
+        "Enabled by default. Required for page cleanup. Scripts run in an isolated frame but can still make network requests."
       )
       .addToggle((toggle) =>
         toggle
@@ -34,4 +34,3 @@ export class HtmlPreviewSettingTab extends PluginSettingTab {
       );
   }
 }
-

@@ -9,7 +9,6 @@ export interface CleanupStorageAdapter {
   rename(from: string, to: string): Promise<void>;
   write(path: string, data: string): Promise<void>;
 }
-
 export interface CleanupStoreProblem {
   message: string;
   path: string;
@@ -249,4 +248,3 @@ export class CleanupRuleStore {
     await this.adapter.write(path, serialize(rules));
   }
 }
-

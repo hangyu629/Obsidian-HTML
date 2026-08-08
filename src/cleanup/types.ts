@@ -5,7 +5,6 @@ export interface AncestorFingerprint {
   id?: string;
   tag: string;
 }
-
 export interface ElementFingerprint {
   ancestors: AncestorFingerprint[];
   attributes: Record<string, string>;
@@ -31,4 +30,3 @@ export interface CleanupDocument {
   rules: CleanupRule[];
   version: 1;
 }
-

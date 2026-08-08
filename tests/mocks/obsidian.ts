@@ -42,7 +42,12 @@ export class ItemView extends Component {
   app: any;
   containerEl = document.createElement("div");
   contentEl = document.createElement("div");
-  actions: Array<{ callback: (event: MouseEvent) => unknown; icon: string; title: string }> = [];
+  actions: Array<{
+    callback: (event: MouseEvent) => unknown;
+    element: HTMLElement;
+    icon: string;
+    title: string;
+  }> = [];
 
   constructor(public leaf: WorkspaceLeaf) {
     super();
@@ -51,8 +56,9 @@ export class ItemView extends Component {
   }
 
   addAction(icon: string, title: string, callback: (event: MouseEvent) => unknown): HTMLElement {
-    this.actions.push({ callback, icon, title });
-    return document.createElement("button");
+    const element = document.createElement("button");
+    this.actions.push({ callback, element, icon, title });
+    return element;
   }
 
   getViewType(): string {
@@ -86,19 +92,69 @@ export class Modal extends Component {
   constructor(public app: unknown) {
     super();
   }
-  open(): void {}
-  close(): void {}
+  open(): void {
+    this.onOpen();
+    document.body.append(this.titleEl, this.contentEl);
+  }
+  close(): void {
+    this.onClose();
+    this.titleEl.remove();
+    this.contentEl.remove();
+  }
   onOpen(): void {}
   onClose(): void {}
 }
 
-export class Plugin extends Component {}
+export class Plugin extends Component {
+  app: any;
+  manifest: any;
+  registeredExtensions: Array<{ extensions: string[]; viewType: string }> = [];
+  registeredViews = new Map<string, (leaf: WorkspaceLeaf) => ItemView>();
+  settingTabs: unknown[] = [];
+  private data: unknown = null;
+
+  constructor(app: unknown = {}, manifest: unknown = {}) {
+    super();
+    this.app = app;
+    this.manifest = manifest;
+  }
+
+  addSettingTab(tab: unknown): void {
+    this.settingTabs.push(tab);
+  }
+
+  async loadData(): Promise<unknown> {
+    return this.data;
+  }
+
+  registerExtensions(extensions: string[], viewType: string): void {
+    this.registeredExtensions.push({ extensions, viewType });
+  }
+
+  registerView(
+    viewType: string,
+    creator: (leaf: WorkspaceLeaf) => ItemView
+  ): void {
+    this.registeredViews.set(viewType, creator);
+  }
+
+  async saveData(data: unknown): Promise<void> {
+    this.data = data;
+  }
+}
 export class PluginSettingTab extends Component {}
 export class Setting {
   constructor(_container: HTMLElement) {}
 }
 
+export class Notice {
+  static messages: string[] = [];
+
+  constructor(message: string) {
+    Notice.messages.push(message);
+  }
+}
+
 export function setIcon(element: HTMLElement, icon: string): void {
   element.dataset.icon = icon;
 }
-

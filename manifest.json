@@ -1,10 +1,9 @@
 {
   "id": "html-preview",
   "name": "HTML Preview",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.5.0",
-  "description": "Preview HTML and HTM files stored in your vault.",
+  "description": "Preview and non-destructively clean up HTML and HTM files in your vault.",
   "author": "Hangyu",
   "isDesktopOnly": false
 }
-

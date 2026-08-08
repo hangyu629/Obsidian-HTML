@@ -1,7 +1,7 @@
 {
   "name": "obsidian-html-preview",
-  "version": "0.1.0",
-  "description": "Preview HTML files as first-class files in Obsidian.",
+  "version": "0.2.0",
+  "description": "Preview and non-destructively clean up HTML files in Obsidian.",
   "private": true,
   "type": "module",
   "scripts": {
