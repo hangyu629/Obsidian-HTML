@@ -15,7 +15,6 @@ let sidebarSequence = 0;
 export interface AnnotationSidebarEnvironment {
   annotationService: Pick<AnnotationService, "load" | "subscribe">;
   exportAnnotations(sourcePath: string, annotations: readonly HtmlAnnotation[]): Promise<void>;
-  repairAnnotation(sourcePath: string, id: string): Promise<boolean>;
   searchAnnotations(): void;
   focusAnnotation(sourcePath: string, id: string): Promise<boolean>;
   removeAnnotation(annotation: HtmlAnnotation): Promise<void>;
@@ -385,31 +384,6 @@ export class AnnotationSidebarView extends ItemView {
         this.environment.showNotice(error instanceof Error ? error.message : String(error));
       });
     });
-    const repair = document.createElement("button");
-    repair.type = "button";
-    repair.className = "clickable-icon annotation-sidebar-action annotation-sidebar-repair";
-    repair.dataset.annotationAction = "repair";
-    repair.setAttribute("aria-label", "Repair annotation");
-    repair.title = "重新定位批注";
-    setIcon(repair, "locate-fixed");
-    repair.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (!sourcePath) return;
-      repair.disabled = true;
-      void this.environment.repairAnnotation(sourcePath, annotation.id)
-        .then((started) => {
-          if (!started) this.environment.showNotice("当前视图无法开始重新定位。请先打开原文预览。 ");
-        })
-        .catch((error) => {
-          this.environment.showNotice(
-            error instanceof Error ? error.message : String(error)
-          );
-        })
-        .finally(() => {
-          repair.disabled = false;
-        });
-    });
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "clickable-icon annotation-sidebar-action";
@@ -428,7 +402,7 @@ export class AnnotationSidebarView extends ItemView {
         );
       });
     });
-    actions.append(edit, copy, repair, remove);
+    actions.append(edit, copy, remove);
     entry.append(item, actions);
     return entry;
   }

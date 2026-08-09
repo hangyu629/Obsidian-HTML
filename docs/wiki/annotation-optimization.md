@@ -20,6 +20,7 @@ Status legend:
 - [x] `done` Add annotation export to Markdown
 - [x] `done` Harden re-anchor heuristics for repeated quotes and larger text rewrites
 - [x] `done` Reorganize annotation sidebar management tools into a responsive drawer with destructive-action confirmation
+- [x] `done` Remove the redundant repair action from annotation cards; card clicks already navigate to highlights
 
 ## Next Roadmap
 

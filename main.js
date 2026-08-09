@@ -878,28 +878,6 @@ ${annotation.comment}` : annotation.quote;
         this.environment.showNotice(error instanceof Error ? error.message : String(error));
       });
     });
-    const repair = document.createElement("button");
-    repair.type = "button";
-    repair.className = "clickable-icon annotation-sidebar-action annotation-sidebar-repair";
-    repair.dataset.annotationAction = "repair";
-    repair.setAttribute("aria-label", "Repair annotation");
-    repair.title = "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8";
-    (0, import_obsidian4.setIcon)(repair, "locate-fixed");
-    repair.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (!sourcePath) return;
-      repair.disabled = true;
-      void this.environment.repairAnnotation(sourcePath, annotation.id).then((started) => {
-        if (!started) this.environment.showNotice("\u5F53\u524D\u89C6\u56FE\u65E0\u6CD5\u5F00\u59CB\u91CD\u65B0\u5B9A\u4F4D\u3002\u8BF7\u5148\u6253\u5F00\u539F\u6587\u9884\u89C8\u3002 ");
-      }).catch((error) => {
-        this.environment.showNotice(
-          error instanceof Error ? error.message : String(error)
-        );
-      }).finally(() => {
-        repair.disabled = false;
-      });
-    });
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "clickable-icon annotation-sidebar-action";
@@ -918,7 +896,7 @@ ${annotation.comment}` : annotation.quote;
         );
       });
     });
-    actions.append(edit, copy, repair, remove);
+    actions.append(edit, copy, remove);
     entry.append(item, actions);
     return entry;
   }
@@ -5223,7 +5201,6 @@ var HtmlPreviewPlugin = class extends import_obsidian12.Plugin {
       (leaf) => new AnnotationSidebarView(leaf, {
         annotationService: this.annotationService,
         exportAnnotations: (sourcePath, annotations) => this.exportAnnotations(sourcePath, annotations),
-        repairAnnotation: (sourcePath, id) => this.annotationService.beginAnnotationRepair(sourcePath, id),
         searchAnnotations: () => this.openAnnotationSearch(),
         focusAnnotation: (sourcePath, id) => this.focusAnnotation(sourcePath, id),
         removeAnnotation: (annotation) => this.annotationService.remove(annotation),

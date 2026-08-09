@@ -63,7 +63,6 @@ function harness(focusResult = true) {
   };
   const showNotice = vi.fn();
   const exportAnnotations = vi.fn(async () => undefined);
-  const repairAnnotation = vi.fn(async () => true);
   const searchAnnotations = vi.fn();
   const copyText = vi.fn(async () => undefined);
   const app = {};
@@ -74,7 +73,6 @@ function harness(focusResult = true) {
     removeAnnotation: (annotation) => annotationService.remove(annotation),
     saveAnnotation: (path, annotation) => annotationService.save(path, annotation),
     exportAnnotations,
-    repairAnnotation,
     searchAnnotations,
     copyText,
     showNotice
@@ -85,7 +83,6 @@ function harness(focusResult = true) {
     annotationService,
     change: () => changeListener?.(),
     exportAnnotations,
-    repairAnnotation,
     searchAnnotations,
     copyText,
     showNotice,
@@ -277,22 +274,15 @@ describe("AnnotationSidebarView", () => {
     );
   });
 
-  it("starts repair from an annotation action", async () => {
-    const { repairAnnotation, view } = harness();
+  it("omits the redundant repair action from annotation cards", async () => {
+    const { view } = harness();
     await view.setSource("notes/a.md");
 
-    const repairButton = view.contentEl.querySelector<HTMLButtonElement>(
-      '[data-annotation-action="repair"]'
-    );
-    expect(repairButton).toBeDefined();
-    repairButton?.click();
-
-    await vi.waitFor(() => {
-      expect(repairAnnotation).toHaveBeenCalledWith(
-        "notes/a.md",
-        "11111111111111111111111111111111"
-      );
-    });
+    const actions = [...view.contentEl.querySelectorAll<HTMLElement>(
+      "[data-annotation-action]"
+    )].map((element) => element.dataset.annotationAction);
+    expect(actions).not.toContain("repair");
+    expect(new Set(actions)).toEqual(new Set(["copy", "delete", "edit"]));
   });
 
   it("edits and deletes annotations from the sidebar without breaking focus navigation", async () => {
