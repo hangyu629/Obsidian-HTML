@@ -417,7 +417,7 @@ describe("AnnotationSidebarView", () => {
     expect(css.match(/padding-inline:\s*var\(--annotation-sidebar-gutter\);/g))
       .toHaveLength(3);
     expect(css).toMatch(
-      /\.annotation-sidebar-management\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) 30px 30px;[^}]*margin-inline:\s*var\(--annotation-sidebar-gutter\);[^}]*padding-inline:\s*0;/
+      /\.annotation-sidebar-management\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) 30px 30px;[^}]*margin-inline:\s*var\(--annotation-sidebar-gutter\);[^}]*padding-inline:\s*8px;/
     );
     expect(css).toMatch(
       /\.annotation-sidebar-entry\s*\{[^}]*position:\s*relative;[^}]*border-bottom:\s*1px solid var\(--background-modifier-border\);/

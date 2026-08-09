@@ -423,7 +423,7 @@
   gap: 6px;
   margin-inline: var(--annotation-sidebar-gutter);
   padding-block: 8px;
-  padding-inline: 0;
+  padding-inline: 8px;
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
