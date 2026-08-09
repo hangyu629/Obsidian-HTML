@@ -125,6 +125,7 @@ The plugin never rewrites HTML or Markdown source files. Cleanup rules and annot
 ```
 
 Each annotation stores its excerpt, surrounding text, offsets, and optional comment. If a substantially rewritten source document leaves an annotation unresolved, choose **Repair** in the Annotation pane, select replacement text, and save the updated target. Whether these files sync depends on whether your sync provider includes hidden folders.
+Malformed annotation data is ignored safely so it does not prevent the source file or Annotation pane from opening.
 
 ### Security and Compatibility
 
@@ -274,6 +275,7 @@ html-preview.theme: dark
 ```
 
 每条批注会保存摘录、前后文、文本位置和可选批注正文。源文档发生大幅改写后，批注可能无法定位；此时可在“注释”栏点击 **重新定位**，选择新的对应文本后保存。是否同步这些文件，取决于同步工具是否包含隐藏目录。
+格式损坏的批注数据会被安全忽略，不会阻止源文件或“注释”栏打开。
 
 ### 安全与兼容性
 

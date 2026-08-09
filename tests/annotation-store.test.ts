@@ -131,4 +131,12 @@ describe("HtmlAnnotationStore", () => {
 
     expect(await store.load("pages/index.html")).toEqual([]);
   });
+
+  it("returns an empty document instead of throwing on malformed JSON", async () => {
+    const adapter = new MemoryAdapter();
+    const store = new HtmlAnnotationStore(adapter);
+    adapter.files.set(annotationPagePath("pages/broken.html"), "{not-json");
+
+    await expect(store.load("pages/broken.html")).resolves.toEqual([]);
+  });
 });

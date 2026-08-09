@@ -136,8 +136,12 @@ var HtmlAnnotationStore = class {
   async read(sourcePath) {
     const path = annotationPagePath(sourcePath);
     if (!await this.adapter.exists(path)) return [];
-    const parsed = parseDocument(JSON.parse(await this.adapter.read(path)));
-    return parsed?.annotations ?? [];
+    try {
+      const parsed = parseDocument(JSON.parse(await this.adapter.read(path)));
+      return parsed?.annotations ?? [];
+    } catch {
+      return [];
+    }
   }
 };
 
