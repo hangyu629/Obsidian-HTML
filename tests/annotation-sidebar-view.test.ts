@@ -351,4 +351,26 @@ describe("AnnotationSidebarView", () => {
     );
     expect(css).toContain("white-space: normal");
   });
+
+  it("aligns sidebar sections and keeps actions inside annotation cards", () => {
+    const css = readFileSync("styles.css", "utf8");
+
+    expect(css).toMatch(
+      /\.annotation-sidebar\s*\{[^}]*--annotation-sidebar-gutter:\s*12px;/
+    );
+    expect(css.match(/padding-inline:\s*var\(--annotation-sidebar-gutter\);/g))
+      .toHaveLength(4);
+    expect(css).toMatch(
+      /\.annotation-sidebar-entry\s*\{[^}]*position:\s*relative;[^}]*display:\s*block;/
+    );
+    expect(css).toMatch(
+      /\.annotation-sidebar-actions\s*\{[^}]*position:\s*absolute;[^}]*top:\s*8px;[^}]*right:\s*8px;/
+    );
+    expect(css).toMatch(
+      /\.annotation-sidebar-entry:has\(\.annotation-sidebar-item\.is-unresolved\)\s*\{[^}]*border-color:\s*var\(--text-warning\);/
+    );
+    expect(css).toMatch(
+      /\.annotation-sidebar-sort,[\s\S]*?\.annotation-sidebar-bulk-color\s*\{[^}]*border:\s*1px solid var\(--background-modifier-border\);/
+    );
+  });
 });
