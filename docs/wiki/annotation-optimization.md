@@ -18,7 +18,7 @@ Status legend:
 - [x] `done` Polish the sidebar annotation edit modal
 - [x] `done` Add clearer bulk and management actions for the sidebar
 - [x] `done` Add annotation export to Markdown
-- [ ] `pending` Harden re-anchor heuristics for repeated quotes and larger text rewrites
+- [x] `done` Harden re-anchor heuristics for repeated quotes and larger text rewrites
 
 ## Notes
 

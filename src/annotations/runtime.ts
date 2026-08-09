@@ -162,13 +162,25 @@ export function createAnnotationRuntimeScript(
       return matched;
     };
 
+    const targetContextScore = (fullText, start, end, target) => {
+      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
+      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
+      return matchingContext(prefix, normalize(target.prefix || ""), true) +
+        matchingContext(suffix, normalize(target.suffix || ""), false);
+    };
+
     const resolveTarget = (target) => {
       const fullText = visibleText();
       const exact = normalize(target.exact || "");
       if (!exact) return null;
       if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
           normalize(fullText.slice(target.start, target.end)) === exact) {
-        return { end: target.end, start: target.start };
+        const targetPrefix = normalize(target.prefix || "");
+        const targetSuffix = normalize(target.suffix || "");
+        const contextLength = targetPrefix.length + targetSuffix.length;
+        if (contextLength > 0 && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
+          return { end: target.end, start: target.start };
+        }
       }
 
       const model = normalizedText(fullText);
@@ -179,13 +191,9 @@ export function createAnnotationRuntimeScript(
         const start = model.starts[normalizedStart];
         const end = model.ends[normalizedEnd - 1];
         if (typeof start === "number" && typeof end === "number") {
-          const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-          const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
-          const targetPrefix = normalize(target.prefix || "");
-          const targetSuffix = normalize(target.suffix || "");
           candidates.push({
             end,
-            score: matchingContext(prefix, targetPrefix, true) + matchingContext(suffix, targetSuffix, false),
+            score: targetContextScore(fullText, start, end, target),
             start
           });
         }
@@ -193,7 +201,10 @@ export function createAnnotationRuntimeScript(
       }
       candidates.sort((left, right) => right.score - left.score ||
         Math.abs(left.start - target.start) - Math.abs(right.start - target.start));
-      return candidates[0] || null;
+      const best = candidates[0];
+      const second = candidates[1];
+      if (!best || (second && best.score === second.score)) return null;
+      return best;
     };
 
     const rangeFromOffsets = (start, end) => {

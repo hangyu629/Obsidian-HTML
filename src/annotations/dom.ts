@@ -81,6 +81,23 @@ function matchingContext(left: string, right: string, fromEnd: boolean): number 
   return matched;
 }
 
+function targetContextScore(
+  fullText: string,
+  start: number,
+  end: number,
+  target: HtmlAnnotationTarget
+): number {
+  const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
+  const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
+  return matchingContext(prefix, normalize(target.prefix ?? ""), true) +
+    matchingContext(suffix, normalize(target.suffix ?? ""), false);
+}
+
+function hasContext(target: HtmlAnnotationTarget): boolean {
+  return normalize(target.prefix ?? "").length > 0 ||
+    normalize(target.suffix ?? "").length > 0;
+}
+
 export function resolveAnnotationTarget(
   fullText: string,
   target: HtmlAnnotationTarget
@@ -89,11 +106,15 @@ export function resolveAnnotationTarget(
   if (!exact) return null;
   if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
     normalize(fullText.slice(target.start, target.end)) === exact) {
-    return {
-      ...target,
-      prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
-      suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
-    };
+    const contextLength = normalize(target.prefix ?? "").length +
+      normalize(target.suffix ?? "").length;
+    if (hasContext(target) && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
+      return {
+        ...target,
+        prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
+        suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
+      };
+    }
   }
 
   const model = normalizedText(fullText);
@@ -104,12 +125,9 @@ export function resolveAnnotationTarget(
     const start = model.starts[normalizedStart];
     const end = model.ends[normalizedEnd - 1];
     if (typeof start === "number" && typeof end === "number") {
-      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
       candidates.push({
         end,
-        score: matchingContext(prefix, normalize(target.prefix ?? ""), true) +
-          matchingContext(suffix, normalize(target.suffix ?? ""), false),
+        score: targetContextScore(fullText, start, end, target),
         start
       });
     }
@@ -122,8 +140,7 @@ export function resolveAnnotationTarget(
   const best = candidates[0];
   const second = candidates[1];
   if (!best) return null;
-  if (second && best.score === second.score &&
-    Math.abs(best.start - target.start) === Math.abs(second.start - target.start)) {
+  if (second && best.score === second.score) {
     return null;
   }
   return {

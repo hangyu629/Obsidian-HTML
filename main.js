@@ -1118,13 +1118,25 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       return matched;
     };
 
+    const targetContextScore = (fullText, start, end, target) => {
+      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
+      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
+      return matchingContext(prefix, normalize(target.prefix || ""), true) +
+        matchingContext(suffix, normalize(target.suffix || ""), false);
+    };
+
     const resolveTarget = (target) => {
       const fullText = visibleText();
       const exact = normalize(target.exact || "");
       if (!exact) return null;
       if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
           normalize(fullText.slice(target.start, target.end)) === exact) {
-        return { end: target.end, start: target.start };
+        const targetPrefix = normalize(target.prefix || "");
+        const targetSuffix = normalize(target.suffix || "");
+        const contextLength = targetPrefix.length + targetSuffix.length;
+        if (contextLength > 0 && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
+          return { end: target.end, start: target.start };
+        }
       }
 
       const model = normalizedText(fullText);
@@ -1135,13 +1147,9 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
         const start = model.starts[normalizedStart];
         const end = model.ends[normalizedEnd - 1];
         if (typeof start === "number" && typeof end === "number") {
-          const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-          const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
-          const targetPrefix = normalize(target.prefix || "");
-          const targetSuffix = normalize(target.suffix || "");
           candidates.push({
             end,
-            score: matchingContext(prefix, targetPrefix, true) + matchingContext(suffix, targetSuffix, false),
+            score: targetContextScore(fullText, start, end, target),
             start
           });
         }
@@ -1149,7 +1157,10 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       }
       candidates.sort((left, right) => right.score - left.score ||
         Math.abs(left.start - target.start) - Math.abs(right.start - target.start));
-      return candidates[0] || null;
+      const best = candidates[0];
+      const second = candidates[1];
+      if (!best || (second && best.score === second.score)) return null;
+      return best;
     };
 
     const rangeFromOffsets = (start, end) => {
@@ -3353,15 +3364,26 @@ function matchingContext(left, right, fromEnd) {
   }
   return matched;
 }
+function targetContextScore(fullText, start, end, target) {
+  const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
+  const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
+  return matchingContext(prefix, normalize(target.prefix ?? ""), true) + matchingContext(suffix, normalize(target.suffix ?? ""), false);
+}
+function hasContext(target) {
+  return normalize(target.prefix ?? "").length > 0 || normalize(target.suffix ?? "").length > 0;
+}
 function resolveAnnotationTarget(fullText, target) {
   const exact = normalize(target.exact ?? "");
   if (!exact) return null;
   if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length && normalize(fullText.slice(target.start, target.end)) === exact) {
-    return {
-      ...target,
-      prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
-      suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
-    };
+    const contextLength = normalize(target.prefix ?? "").length + normalize(target.suffix ?? "").length;
+    if (hasContext(target) && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
+      return {
+        ...target,
+        prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
+        suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
+      };
+    }
   }
   const model = normalizedText(fullText);
   const candidates = [];
@@ -3371,11 +3393,9 @@ function resolveAnnotationTarget(fullText, target) {
     const start = model.starts[normalizedStart];
     const end = model.ends[normalizedEnd - 1];
     if (typeof start === "number" && typeof end === "number") {
-      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
       candidates.push({
         end,
-        score: matchingContext(prefix, normalize(target.prefix ?? ""), true) + matchingContext(suffix, normalize(target.suffix ?? ""), false),
+        score: targetContextScore(fullText, start, end, target),
         start
       });
     }
@@ -3387,7 +3407,7 @@ function resolveAnnotationTarget(fullText, target) {
   const best = candidates[0];
   const second = candidates[1];
   if (!best) return null;
-  if (second && best.score === second.score && Math.abs(best.start - target.start) === Math.abs(second.start - target.start)) {
+  if (second && best.score === second.score) {
     return null;
   }
   return {
