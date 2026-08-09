@@ -423,4 +423,26 @@ describe("EnhancedMarkdownView", () => {
     expect(adapter?.beginAnnotationRepair?.(existing.id)).toBe(true);
     expect(showNotice).toHaveBeenCalledWith("请选择新的文本来重新定位这条批注。");
   });
+
+  it("restores the document scroll position after rerendering", async () => {
+    const { view } = harness();
+    await view.onLoadFile(file("notes/example.md"));
+    const root = view.contentEl.querySelector<HTMLElement>(".enhanced-markdown-document")!;
+    Object.defineProperty(root, "scrollTop", { configurable: true, value: 260, writable: true });
+    await view.onLoadFile(file("notes/example.md"));
+    expect((view.contentEl.querySelector<HTMLElement>(".enhanced-markdown-document") as any).scrollTop)
+      .toBe(260);
+  });
+
+  it("prints the enhanced reading document", async () => {
+    const print = vi.fn();
+    vi.stubGlobal("print", print);
+    const { view } = harness();
+    await view.onLoadFile(file("notes/example.md"));
+    const action = actions(view).find((item) => item.title === "Print reading page");
+    expect(action).toBeDefined();
+    action?.callback(new MouseEvent("click"));
+    expect(print).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
 });

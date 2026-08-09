@@ -68,6 +68,7 @@ export class EnhancedMarkdownView extends FileView {
   private sessionMode: TemplateResolutionMode = "manual";
   private sessionSelection: TemplateSelection | null = null;
   private returnMode: "source" | "preview" = "preview";
+  private scrollTop = 0;
   private pendingRepairId: string | null = null;
 
   constructor(
@@ -128,6 +129,9 @@ export class EnhancedMarkdownView extends FileView {
         this.file.path,
         this.sessionSelection
       );
+    });
+    this.addAction("printer", "Print reading page", () => {
+      window.print();
     });
     this.annotationUi = new AnnotationContextualUi(this.contentEl, {
       onDelete: (annotation) => this.deleteAnnotation(annotation),
@@ -244,6 +248,8 @@ export class EnhancedMarkdownView extends FileView {
   private async render(): Promise<void> {
     const file = this.file;
     if (!file) return;
+    const previous = this.contentEl.querySelector<HTMLElement>(".enhanced-markdown-document");
+    if (previous) this.scrollTop = previous.scrollTop;
     const token = ++this.renderToken;
     this.annotationUi?.close();
     const frontmatter = this.environment.getFrontmatter(file);
@@ -293,6 +299,7 @@ export class EnhancedMarkdownView extends FileView {
       this.renderComponent = component;
       this.activeAnnotations = [...annotations];
       this.contentEl.replaceChildren(root);
+      root.scrollTop = this.scrollTop;
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
       await this.persistRecoveredTargets(file.path, annotations, resolvedAnnotations);
     } catch (error) {

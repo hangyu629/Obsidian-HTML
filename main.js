@@ -4640,6 +4640,7 @@ var EnhancedMarkdownView = class extends import_obsidian9.FileView {
   sessionMode = "manual";
   sessionSelection = null;
   returnMode = "preview";
+  scrollTop = 0;
   pendingRepairId = null;
   getViewType() {
     return ENHANCED_MARKDOWN_VIEW_TYPE;
@@ -4686,6 +4687,9 @@ var EnhancedMarkdownView = class extends import_obsidian9.FileView {
         this.file.path,
         this.sessionSelection
       );
+    });
+    this.addAction("printer", "Print reading page", () => {
+      window.print();
     });
     this.annotationUi = new AnnotationContextualUi(this.contentEl, {
       onDelete: (annotation) => this.deleteAnnotation(annotation),
@@ -4794,6 +4798,8 @@ var EnhancedMarkdownView = class extends import_obsidian9.FileView {
   async render() {
     const file = this.file;
     if (!file) return;
+    const previous = this.contentEl.querySelector(".enhanced-markdown-document");
+    if (previous) this.scrollTop = previous.scrollTop;
     const token = ++this.renderToken;
     this.annotationUi?.close();
     const frontmatter = this.environment.getFrontmatter(file);
@@ -4836,6 +4842,7 @@ var EnhancedMarkdownView = class extends import_obsidian9.FileView {
       this.renderComponent = component;
       this.activeAnnotations = [...annotations];
       this.contentEl.replaceChildren(root);
+      root.scrollTop = this.scrollTop;
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
       await this.persistRecoveredTargets(file.path, annotations, resolvedAnnotations);
     } catch (error) {

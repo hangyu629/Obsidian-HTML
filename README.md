@@ -74,6 +74,7 @@ Markdown source and native preview remain intact. Use **Enhanced reading** from 
 - **Preview** returns to Obsidian's native Markdown preview.
 - **Template & theme** switches layout and theme without splitting the page or opening another tab.
   The chooser shows the active template, theme, and whether it came from frontmatter, a folder mapping, or the default setting.
+- Enhanced reading restores its scroll position after a rerender and includes a **Print reading page** action.
 - The same contextual highlight and comment controls are available, with entries visible in the right-side Annotation pane.
 
 Built-in templates:
@@ -222,6 +223,7 @@ Markdown 源码和原生预览模式保持不变。通过 Markdown 视图中的 
 - **Preview**：返回 Obsidian 原生 Markdown 预览。
 - **Template & theme**：直接切换布局和主题，不分屏、不新开标签。
   选择器会显示当前模板、主题，以及它来自 frontmatter、文件夹规则还是默认设置。
+- 增强阅读在重新渲染后会恢复滚动位置，并提供 **Print reading page** 操作。
 - 与 HTML 预览相同的高亮和批注操作，内容会显示在右侧“注释”栏中。
 
 内置模板：

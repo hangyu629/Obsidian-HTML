@@ -39,7 +39,7 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Support custom template packages, preview thumbnails, reusable variables, and rule precedence inspection.
 - [x] `done` Improve HTML cleanup workflow
   - Add before/after comparison, stronger candidate grouping, and a clear restore-original action.
-- [ ] `pending` Improve reading experience
+- [x] `done` Improve reading experience
   - Persist scroll position, add print/PDF output, synchronized outline scrolling, image lightbox, and code-copy controls.
 - [ ] `pending` Reduce runtime drift and improve resilience
   - Keep DOM and iframe annotation resolution logic generated from one source.
