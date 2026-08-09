@@ -554,30 +554,93 @@
   text-align: center;
 }
 
+.annotation-sidebar-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.annotation-sidebar-modal-meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
 .annotation-sidebar-modal-label {
   display: block;
-  margin: 10px 0 6px;
+  margin: 0;
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   font-weight: 600;
 }
 
-.annotation-sidebar-modal-select,
 .annotation-sidebar-modal-textarea {
   width: 100%;
   box-sizing: border-box;
 }
 
+.annotation-sidebar-modal-palette {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.annotation-sidebar-modal-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--background-primary);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--background-modifier-border-hover);
+}
+
+.annotation-sidebar-modal-swatch[data-annotation-color="yellow"] {
+  background: #d2ad3f;
+}
+
+.annotation-sidebar-modal-swatch[data-annotation-color="green"] {
+  background: #62a674;
+}
+
+.annotation-sidebar-modal-swatch[data-annotation-color="blue"] {
+  background: #5794ba;
+}
+
+.annotation-sidebar-modal-swatch[data-annotation-color="pink"] {
+  background: #c76f88;
+}
+
+.annotation-sidebar-modal-swatch[data-annotation-color="violet"] {
+  background: #8970b2;
+}
+
+.annotation-sidebar-modal-swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--interactive-accent);
+}
+
+.annotation-sidebar-modal-quote-card {
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
 .annotation-sidebar-modal-quote {
-  margin: 12px 0;
+  margin: 0;
   padding-left: 10px;
   border-left: 3px solid var(--background-modifier-border-hover);
   color: var(--text-muted);
+  line-height: 1.6;
 }
 
 .annotation-sidebar-modal-textarea {
   min-height: 120px;
   resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
 }
 
 .annotation-sidebar-modal-actions {

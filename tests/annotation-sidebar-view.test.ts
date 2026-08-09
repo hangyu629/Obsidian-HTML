@@ -158,12 +158,11 @@ describe("AnnotationSidebarView", () => {
     const textarea = document.body.querySelector<HTMLTextAreaElement>(
       '[aria-label="Annotation comment"]'
     )!;
-    const color = document.body.querySelector<HTMLSelectElement>(
-      '[aria-label="Annotation color"]'
+    const pink = document.body.querySelector<HTMLButtonElement>(
+      '[data-annotation-color-choice="pink"]'
     )!;
     textarea.value = "Updated from sidebar";
-    color.value = "pink";
-    color.dispatchEvent(new Event("change", { bubbles: true }));
+    pink.click();
     document.body.querySelector<HTMLButtonElement>('[aria-label="Save annotation"]')?.click();
 
     await vi.waitFor(() => {

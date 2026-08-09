@@ -216,22 +216,43 @@ var AnnotationSidebarEditModal = class extends import_obsidian.Modal {
   onOpen() {
     this.titleEl.textContent = "\u7F16\u8F91\u6279\u6CE8";
     this.contentEl.replaceChildren();
+    let selectedColor = this.options.annotation.color ?? "yellow";
+    const root = document.createElement("div");
+    root.className = "annotation-sidebar-modal";
+    const meta = document.createElement("p");
+    meta.className = "annotation-sidebar-modal-meta";
+    meta.textContent = "\u8C03\u6574\u9AD8\u4EAE\u989C\u8272\u548C\u6279\u6CE8\u5185\u5BB9";
     const quote = document.createElement("blockquote");
     quote.className = "annotation-sidebar-modal-quote";
     quote.textContent = `\u201C${this.options.annotation.quote}\u201D`;
+    const quoteCard = document.createElement("div");
+    quoteCard.className = "annotation-sidebar-modal-quote-card";
+    quoteCard.append(quote);
     const colorLabel = document.createElement("label");
     colorLabel.className = "annotation-sidebar-modal-label";
     colorLabel.textContent = "\u989C\u8272";
-    const color = document.createElement("select");
-    color.className = "annotation-sidebar-modal-select";
-    color.setAttribute("aria-label", "Annotation color");
+    const palette = document.createElement("div");
+    palette.className = "annotation-sidebar-modal-palette";
+    palette.setAttribute("aria-label", "Annotation color");
     for (const value of ANNOTATION_COLORS) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = COLOR_LABELS[value];
-      color.append(option);
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "annotation-sidebar-modal-swatch";
+      swatch.dataset.annotationColorChoice = value;
+      swatch.dataset.annotationColor = value;
+      swatch.setAttribute("aria-label", COLOR_LABELS[value]);
+      swatch.setAttribute("aria-pressed", String(value === selectedColor));
+      swatch.addEventListener("click", () => {
+        selectedColor = value;
+        for (const candidate of palette.querySelectorAll("[data-annotation-color-choice]")) {
+          candidate.setAttribute(
+            "aria-pressed",
+            String(candidate.dataset.annotationColorChoice === selectedColor)
+          );
+        }
+      });
+      palette.append(swatch);
     }
-    color.value = this.options.annotation.color ?? "yellow";
     const commentLabel = document.createElement("label");
     commentLabel.className = "annotation-sidebar-modal-label";
     commentLabel.textContent = "\u6279\u6CE8";
@@ -254,21 +275,26 @@ var AnnotationSidebarEditModal = class extends import_obsidian.Modal {
     save.addEventListener("click", () => {
       save.disabled = true;
       cancel.disabled = true;
-      color.disabled = true;
+      for (const swatch of palette.querySelectorAll("button")) {
+        swatch.disabled = true;
+      }
       textarea.disabled = true;
       void this.options.onSave({
         ...this.options.annotation,
-        color: color.value,
+        color: selectedColor,
         comment: textarea.value.trim()
       }).then(() => this.close()).catch(() => {
         save.disabled = false;
         cancel.disabled = false;
-        color.disabled = false;
+        for (const swatch of palette.querySelectorAll("button")) {
+          swatch.disabled = false;
+        }
         textarea.disabled = false;
       });
     });
     actions.append(cancel, save);
-    this.contentEl.append(colorLabel, color, quote, commentLabel, textarea, actions);
+    root.append(meta, quoteCard, colorLabel, palette, commentLabel, textarea, actions);
+    this.contentEl.append(root);
     textarea.focus();
   }
   onClose() {
