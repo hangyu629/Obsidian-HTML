@@ -142,6 +142,32 @@ describe("AnnotationSidebarView", () => {
     expect(view.contentEl.querySelectorAll(".annotation-sidebar-item")).toHaveLength(2);
   });
 
+  it("toggles a compact management band and preserves it across filters", async () => {
+    const { view } = harness();
+    await view.setSource("notes/a.md");
+    const toggle = view.contentEl.querySelector<HTMLButtonElement>(
+      '[aria-label="Manage annotations"]'
+    );
+
+    expect(toggle).not.toBeNull();
+    const managementId = toggle?.getAttribute("aria-controls") ?? "";
+    expect(managementId).not.toBe("");
+    expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
+      .toBe(true);
+
+    toggle?.click();
+    expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
+      .toBe(false);
+    clickByText(view.contentEl, "有批注");
+    expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
+      .toBe(false);
+
+    await view.setSource("notes/b.md");
+    expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
+      .toBe(true);
+  });
+
   it("supports changing sort order and bulk deleting filtered annotations", async () => {
     const { annotationService, view } = harness();
     await view.setSource("notes/a.md");

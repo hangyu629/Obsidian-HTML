@@ -9,6 +9,8 @@ export const ANNOTATION_SIDEBAR_VIEW_TYPE = "html-preview-annotations";
 type AnnotationFilter = "all" | "comments" | "highlights";
 type AnnotationSort = "document" | "newest";
 
+let sidebarSequence = 0;
+
 export interface AnnotationSidebarEnvironment {
   annotationService: Pick<AnnotationService, "load" | "subscribe">;
   exportAnnotations(sourcePath: string, annotations: readonly HtmlAnnotation[]): Promise<void>;
@@ -22,8 +24,10 @@ export interface AnnotationSidebarEnvironment {
 }
 
 export class AnnotationSidebarView extends ItemView {
+  private readonly managementId = `annotation-sidebar-management-${++sidebarSequence}`;
   private annotations: HtmlAnnotation[] = [];
   private filter: AnnotationFilter = "all";
+  private managementOpen = false;
   private sort: AnnotationSort = "document";
   private loadToken = 0;
   private sourcePath: string | null = null;
@@ -66,6 +70,7 @@ export class AnnotationSidebarView extends ItemView {
     this.unsubscribe = null;
     this.sourcePath = sourcePath;
     this.filter = "all";
+    this.managementOpen = false;
     this.annotations = [];
     const token = ++this.loadToken;
     this.render();
@@ -157,10 +162,26 @@ export class AnnotationSidebarView extends ItemView {
       });
       filters.append(button);
     }
+    const managementToggle = document.createElement("button");
+    managementToggle.type = "button";
+    managementToggle.className =
+      "clickable-icon annotation-sidebar-management-toggle";
+    managementToggle.setAttribute("aria-label", "Manage annotations");
+    managementToggle.setAttribute("aria-controls", this.managementId);
+    managementToggle.setAttribute("aria-expanded", String(this.managementOpen));
+    managementToggle.title = "整理注释";
+    setIcon(managementToggle, "sliders-horizontal");
+    managementToggle.addEventListener("click", () => {
+      this.managementOpen = !this.managementOpen;
+      this.render();
+    });
+    filters.append(managementToggle);
     fragment.append(filters);
 
     const management = document.createElement("div");
     management.className = "annotation-sidebar-management";
+    management.id = this.managementId;
+    management.hidden = !this.managementOpen;
     const sort = document.createElement("select");
     sort.className = "annotation-sidebar-sort";
     sort.setAttribute("aria-label", "Annotation sort order");
@@ -190,10 +211,16 @@ export class AnnotationSidebarView extends ItemView {
     noColor.value = "";
     noColor.textContent = "批量改色";
     bulkColor.append(noColor);
-    for (const color of ["yellow", "green", "blue", "pink", "violet"] as const) {
+    for (const [color, label] of [
+      ["yellow", "黄色"],
+      ["green", "绿色"],
+      ["blue", "蓝色"],
+      ["pink", "粉色"],
+      ["violet", "紫色"]
+    ] as const) {
       const option = document.createElement("option");
       option.value = color;
-      option.textContent = color;
+      option.textContent = label;
       bulkColor.append(option);
     }
     const exportButton = document.createElement("button");

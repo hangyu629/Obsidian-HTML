@@ -333,6 +333,7 @@
   padding: 0;
   color: var(--text-normal);
   background: var(--background-secondary);
+  container-type: inline-size;
 }
 
 .annotation-sidebar-header {
@@ -373,43 +374,68 @@
 
 .annotation-sidebar-filters {
   display: flex;
-  gap: 5px;
-  padding: 0 12px 11px;
+  gap: 3px;
+  align-items: center;
+  padding: 0 10px 9px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.annotation-sidebar-management {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px 10px;
+.annotation-sidebar-management-toggle {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  color: var(--text-muted);
 }
 
-.annotation-sidebar-sort {
-  min-width: 120px;
+.annotation-sidebar-management-toggle:hover,
+.annotation-sidebar-management-toggle[aria-expanded="true"] {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.annotation-sidebar-management {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 7px;
+  padding: 9px 10px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary-alt);
+}
+
+.annotation-sidebar-sort,
+.annotation-sidebar-bulk-color {
+  width: 100%;
+  min-width: 0;
   min-height: 30px;
 }
 
 .annotation-sidebar-bulk-delete {
+  width: 100%;
   min-height: 30px;
   padding: 5px 10px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  color: var(--text-normal);
+  color: var(--text-error);
   background: var(--background-primary);
+  font-size: var(--font-ui-smaller);
+  letter-spacing: 0;
 }
 
 .annotation-sidebar-export {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
+  width: 100%;
   min-height: 30px;
   padding: 5px 9px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   color: var(--text-normal);
   background: var(--background-primary);
+  font-size: var(--font-ui-smaller);
+  letter-spacing: 0;
 }
 
 .annotation-sidebar-export:hover,
@@ -439,6 +465,12 @@
   border-color: var(--background-modifier-border-hover);
   color: var(--text-normal);
   background: var(--background-primary);
+}
+
+@container (max-width: 280px) {
+  .annotation-sidebar-management {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .annotation-sidebar-list {
