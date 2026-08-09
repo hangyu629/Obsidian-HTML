@@ -403,6 +403,10 @@
   background: var(--background-secondary-alt);
 }
 
+.annotation-sidebar-management[hidden] {
+  display: none;
+}
+
 .annotation-sidebar-sort,
 .annotation-sidebar-bulk-color {
   width: 100%;

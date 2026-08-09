@@ -19,6 +19,7 @@ Status legend:
 - [x] `done` Add clearer bulk and management actions for the sidebar
 - [x] `done` Add annotation export to Markdown
 - [x] `done` Harden re-anchor heuristics for repeated quotes and larger text rewrites
+- [x] `done` Reorganize annotation sidebar management tools into a responsive drawer with destructive-action confirmation
 
 ## Next Roadmap
 

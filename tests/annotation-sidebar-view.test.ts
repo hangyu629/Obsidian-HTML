@@ -355,6 +355,10 @@ describe("AnnotationSidebarView", () => {
     expect(css).toContain('.annotation-sidebar-item[data-annotation-color="pink"]');
     expect(css).toContain('.annotation-sidebar-item[data-annotation-color="violet"]');
     expect(css).toContain(".annotation-sidebar-item.is-unresolved");
+    expect(css).toContain(".annotation-sidebar-management[hidden]");
+    expect(css).toMatch(
+      /\.annotation-sidebar-management\[hidden\]\s*\{[^}]*display:\s*none;/
+    );
     expect(css).toContain("white-space: normal");
   });
 });
