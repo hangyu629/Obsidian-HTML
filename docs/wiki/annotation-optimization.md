@@ -23,6 +23,7 @@ Status legend:
 - [x] `done` Remove the redundant repair action from annotation cards; card clicks already navigate to highlights
 - [x] `done` Replace the oversized card layout with a compact one-row management toolbar and a lightweight aligned annotation list
 - [x] `done` Prevent stale annotation paint after expanding or collapsing management controls
+- [x] `done` Align the management toolbar background and controls to the same horizontal grid as the sidebar header, filters, and annotation list
 
 ## Next Roadmap
 
