@@ -196,6 +196,26 @@ describe("HtmlPreviewView", () => {
     );
   });
 
+  it("temporarily restores the original page without deleting cleanup rules", async () => {
+    const cleanupStore = createCleanupStore([validRule]);
+    const { cleanupStore: store, view } = createHarness(undefined, true, cleanupStore);
+    await view.onLoadFile(createFile("pages/index.html"));
+    expect(view.contentEl.querySelector("iframe")?.srcdoc).toContain(validRule.id);
+
+    const restore = viewActions(view).find(
+      (action) => action.title === "View original page"
+    );
+    expect(restore).toBeDefined();
+    await restore?.callback(new MouseEvent("click"));
+    await flushAsyncWork();
+
+    expect(view.contentEl.querySelector("iframe")?.srcdoc).not.toContain(validRule.id);
+    expect(store.removeRule).not.toHaveBeenCalled();
+    await restore?.callback(new MouseEvent("click"));
+    await flushAsyncWork();
+    expect(view.contentEl.querySelector("iframe")?.srcdoc).toContain(validRule.id);
+  });
+
   it("exposes cleanup actions and sends token-bound mode commands", async () => {
     const { view } = createHarness();
     await view.onLoadFile(createFile("pages/index.html"));

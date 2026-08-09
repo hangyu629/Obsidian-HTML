@@ -58,6 +58,7 @@ The repository tracks the Obsidian release files: `main.js`, `manifest.json`, an
 3. Open the HTML file from Obsidian's file explorer.
 4. Use **Clean up page** in the toolbar, select an unwanted region, and hide it.
 5. Use **Undo cleanup** for the latest cleanup in the current view, or use **Manage cleanup rules** to restore, reset, or promote saved rules.
+   Use **View original page** to temporarily compare the untouched page; this does not remove saved cleanup rules.
 6. Select page text and use the contextual **Color** or **Comment** action. Click an existing highlight to change its color, edit its comment, or delete it.
 7. Run **Open annotation sidebar** from the command palette to browse and locate annotations for the current file. The pane is restored automatically when the plugin is re-enabled.
 8. In the Annotation pane, use the search icon or **Search annotations across the Vault** to search excerpts, comments, and source paths. Filter by folder, color, or annotation type, then select a result to open and locate it.
@@ -204,6 +205,7 @@ npm run check     # 测试、类型检查、生产构建和发布校验
 3. 在 Obsidian 文件列表中打开 HTML 文件。
 4. 使用视图工具栏中的 **Clean up page**，选择并隐藏不需要的页面区域。
 5. 使用 **Undo cleanup** 撤销当前视图中的最近一次清理，或使用 **Manage cleanup rules** 恢复、清空或提升已保存的规则。
+   使用 **View original page** 可以临时对比未清理的原始页面，不会删除已保存的清理规则。
 6. 选择页面文字，使用浮动的 **颜色** 或 **注释** 操作。点击已有高亮可以修改颜色、编辑批注或删除。
 7. 从命令面板执行 **Open annotation sidebar**，在右侧浏览并定位当前文件的批注。插件重新启用后，侧栏会自动恢复。
 8. 在“注释”栏点击搜索图标，或从命令面板执行 **Search annotations across the Vault**，即可搜索摘录、批注正文和来源文件。支持按文件夹、颜色和批注类型筛选，点击结果会打开并定位原文。

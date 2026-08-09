@@ -143,6 +143,8 @@ export class HtmlPreviewView extends FileView {
   private activeRules: CleanupRule[] = [];
   private suppressAnnotationRenders = 0;
   private cleanupAction: HTMLElement | null = null;
+  private originalAction: HTMLElement | null = null;
+  private showOriginal = false;
   private cleanupMode = false;
   private diagnostics: DisplayDiagnostic[] = [];
   private frame: HTMLIFrameElement | null = null;
@@ -181,6 +183,12 @@ export class HtmlPreviewView extends FileView {
     this.cleanupAction = this.addAction("eraser", "Clean up page", () => {
       this.toggleCleanupMode();
     });
+    this.originalAction = this.addAction("eye-off", "View original page", () => {
+      this.showOriginal = !this.showOriginal;
+      this.updateOriginalAction();
+      void this.render();
+    });
+    this.updateOriginalAction();
     this.updateCleanupAction();
     this.addAction("undo-2", "Undo cleanup", () => {
       void this.undoCleanup();
@@ -204,6 +212,8 @@ export class HtmlPreviewView extends FileView {
     if (this.file?.path !== file.path) {
       this.undoStack = [];
       this.setCleanupMode(false, false);
+      this.showOriginal = false;
+      this.updateOriginalAction();
     }
     this.file = file;
     this.subscribe(file.path);
@@ -222,6 +232,7 @@ export class HtmlPreviewView extends FileView {
     this.activeRenderId = "";
     this.activeAnnotations = [];
     this.activeRules = [];
+    this.showOriginal = false;
     this.suppressAnnotationRenders = 0;
     this.unmatchedRuleIds.clear();
     this.undoStack = [];
@@ -327,7 +338,7 @@ export class HtmlPreviewView extends FileView {
 
       const result = buildPreviewDocument({
         allowScripts,
-        cleanupRules,
+        cleanupRules: this.showOriginal ? [] : cleanupRules,
         annotations,
         knownVaultPaths: this.environment.getKnownVaultPaths(),
         renderId,
@@ -694,6 +705,17 @@ export class HtmlPreviewView extends FileView {
   private updateCleanupAction(): void {
     this.cleanupAction?.classList.toggle("is-active", this.cleanupMode);
     this.cleanupAction?.setAttribute("aria-pressed", String(this.cleanupMode));
+  }
+
+  private updateOriginalAction(): void {
+    if (!this.originalAction) return;
+    this.originalAction.classList.toggle("is-active", this.showOriginal);
+    this.originalAction.setAttribute("aria-pressed", String(this.showOriginal));
+    this.originalAction.setAttribute(
+      "aria-label",
+      this.showOriginal ? "Apply cleanup rules" : "View original page"
+    );
+    this.originalAction.title = this.showOriginal ? "Apply cleanup rules" : "View original page";
   }
 
   private postCleanupMode(): void {

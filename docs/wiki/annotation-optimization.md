@@ -37,7 +37,7 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Keep destructive batch actions explicit and recoverable.
 - [ ] `pending` Expand the template system
   - Support custom template packages, preview thumbnails, reusable variables, and rule precedence inspection.
-- [ ] `pending` Improve HTML cleanup workflow
+- [x] `done` Improve HTML cleanup workflow
   - Add before/after comparison, stronger candidate grouping, and a clear restore-original action.
 - [ ] `pending` Improve reading experience
   - Persist scroll position, add print/PDF output, synchronized outline scrolling, image lightbox, and code-copy controls.
