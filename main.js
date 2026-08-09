@@ -1190,6 +1190,97 @@ var CleanupRuleStore = class {
 // src/html-preview-view.ts
 var import_obsidian6 = require("obsidian");
 
+// src/annotations/locator.ts
+function normalizeAnnotationText(value) {
+  return value.replace(/\s+/g, " ").trim();
+}
+function createNormalizedText(value) {
+  let text = "";
+  const starts = [];
+  const ends = [];
+  let index = 0;
+  while (index < value.length) {
+    if (!/\s/.test(value[index] ?? "")) {
+      text += value[index];
+      starts.push(index);
+      ends.push(index + 1);
+      index += 1;
+      continue;
+    }
+    const start = index;
+    while (index < value.length && /\s/.test(value[index] ?? "")) index += 1;
+    if (text.length > 0 && index < value.length) {
+      text += " ";
+      starts.push(start);
+      ends.push(index);
+    }
+  }
+  return { ends, starts, text };
+}
+function matchingAnnotationContext(left, right, fromEnd) {
+  const limit = Math.min(left.length, right.length);
+  let matched = 0;
+  for (let length = 1; length <= limit; length += 1) {
+    const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
+    const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
+    if (leftPart === rightPart) matched = length;
+  }
+  return matched;
+}
+function annotationContextScore(fullText, start, end, target) {
+  const prefix = normalizeAnnotationText(fullText.slice(Math.max(0, start - 96), start));
+  const suffix = normalizeAnnotationText(fullText.slice(end, Math.min(fullText.length, end + 96)));
+  return matchingAnnotationContext(
+    prefix,
+    normalizeAnnotationText(target.prefix ?? ""),
+    true
+  ) + matchingAnnotationContext(
+    suffix,
+    normalizeAnnotationText(target.suffix ?? ""),
+    false
+  );
+}
+function resolveAnnotationOffsets(fullText, target) {
+  const exact = normalizeAnnotationText(target.exact ?? "");
+  if (!exact) return null;
+  const contextLength = normalizeAnnotationText(target.prefix ?? "").length + normalizeAnnotationText(target.suffix ?? "").length;
+  if (contextLength > 0 && target.start >= 0 && target.end >= target.start && target.end <= fullText.length && normalizeAnnotationText(fullText.slice(target.start, target.end)) === exact && annotationContextScore(fullText, target.start, target.end, target) === contextLength) {
+    return { end: target.end, start: target.start };
+  }
+  const model = createNormalizedText(fullText);
+  const candidates = [];
+  let normalizedStart = model.text.indexOf(exact);
+  while (normalizedStart >= 0) {
+    const normalizedEnd = normalizedStart + exact.length;
+    const start = model.starts[normalizedStart];
+    const end = model.ends[normalizedEnd - 1];
+    if (typeof start === "number" && typeof end === "number") {
+      candidates.push({
+        end,
+        score: annotationContextScore(fullText, start, end, target),
+        start
+      });
+    }
+    normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
+  }
+  candidates.sort(
+    (left, right) => right.score - left.score || Math.abs(left.start - target.start) - Math.abs(right.start - target.start)
+  );
+  const best = candidates[0];
+  const second = candidates[1];
+  if (!best || second && best.score === second.score) return null;
+  return { end: best.end, start: best.start };
+}
+function createAnnotationLocatorRuntimeSource() {
+  return [
+    `const normalizeAnnotationText = ${normalizeAnnotationText.toString()};`,
+    `const createNormalizedText = ${createNormalizedText.toString()};`,
+    `const matchingAnnotationContext = ${matchingAnnotationContext.toString()};`,
+    `const annotationContextScore = ${annotationContextScore.toString()};`,
+    `const resolveAnnotationOffsets = ${resolveAnnotationOffsets.toString()};`
+  ].join("\n");
+}
+
 // src/annotations/runtime.ts
 var ANNOTATION_SAVE_MESSAGE_TYPE = "obsidian-html-preview:annotation-save";
 var ANNOTATION_DELETE_MESSAGE_TYPE = "obsidian-html-preview:annotation-delete";
@@ -1201,6 +1292,7 @@ var ANNOTATION_REPAIR_MESSAGE_TYPE = "obsidian-html-preview:annotation-repair";
 var ANNOTATION_SYNC_SAVE_MESSAGE_TYPE = "obsidian-html-preview:annotation-sync-save";
 var ANNOTATION_SYNC_DELETE_MESSAGE_TYPE = "obsidian-html-preview:annotation-sync-delete";
 function createAnnotationRuntimeScript(renderId, annotations = []) {
+  const locatorRuntimeSource = createAnnotationLocatorRuntimeSource();
   const styleText = `
     body, body * { -webkit-user-select: text !important; user-select: text !important; }
     mark[data-obsidian-html-preview-annotation] { color: inherit !important; padding: 0 .08em !important; border-radius: 2px !important; cursor: pointer !important; }
@@ -1306,87 +1398,8 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       return position;
     };
 
-    const normalize = (value) => value.replace(/\\s+/g, " ").trim();
-
-    const normalizedText = (value) => {
-      let text = "";
-      const starts = [];
-      const ends = [];
-      let index = 0;
-      while (index < value.length) {
-        if (!/\\s/.test(value[index])) {
-          text += value[index];
-          starts.push(index);
-          ends.push(index + 1);
-          index += 1;
-          continue;
-        }
-        const start = index;
-        while (index < value.length && /\\s/.test(value[index])) index += 1;
-        if (text.length > 0 && index < value.length) {
-          text += " ";
-          starts.push(start);
-          ends.push(index);
-        }
-      }
-      return { ends, starts, text };
-    };
-
-    const matchingContext = (left, right, fromEnd) => {
-      const limit = Math.min(left.length, right.length);
-      let matched = 0;
-      for (let length = 1; length <= limit; length += 1) {
-        const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
-        const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
-        if (leftPart === rightPart) matched = length;
-      }
-      return matched;
-    };
-
-    const targetContextScore = (fullText, start, end, target) => {
-      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
-      return matchingContext(prefix, normalize(target.prefix || ""), true) +
-        matchingContext(suffix, normalize(target.suffix || ""), false);
-    };
-
-    const resolveTarget = (target) => {
-      const fullText = visibleText();
-      const exact = normalize(target.exact || "");
-      if (!exact) return null;
-      if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
-          normalize(fullText.slice(target.start, target.end)) === exact) {
-        const targetPrefix = normalize(target.prefix || "");
-        const targetSuffix = normalize(target.suffix || "");
-        const contextLength = targetPrefix.length + targetSuffix.length;
-        if (contextLength > 0 && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
-          return { end: target.end, start: target.start };
-        }
-      }
-
-      const model = normalizedText(fullText);
-      const candidates = [];
-      let normalizedStart = model.text.indexOf(exact);
-      while (normalizedStart >= 0) {
-        const normalizedEnd = normalizedStart + exact.length;
-        const start = model.starts[normalizedStart];
-        const end = model.ends[normalizedEnd - 1];
-        if (typeof start === "number" && typeof end === "number") {
-          candidates.push({
-            end,
-            score: targetContextScore(fullText, start, end, target),
-            start
-          });
-        }
-        normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
-      }
-      candidates.sort((left, right) => right.score - left.score ||
-        Math.abs(left.start - target.start) - Math.abs(right.start - target.start));
-      const best = candidates[0];
-      const second = candidates[1];
-      if (!best || (second && best.score === second.score)) return null;
-      return best;
-    };
+    ${locatorRuntimeSource}
+    const resolveTarget = (target) => resolveAnnotationOffsets(visibleText(), target);
 
     const rangeFromOffsets = (start, end) => {
       const startPoint = resolveOffset(start);
@@ -1869,7 +1882,7 @@ var CLEANUP_MODE_STATE_MESSAGE_TYPE = "obsidian-html-preview:cleanup-mode-state"
 var CLEANUP_SELECTED_MESSAGE_TYPE = "obsidian-html-preview:cleanup-selected";
 var CLEANUP_UNMATCHED_MESSAGE_TYPE = "obsidian-html-preview:cleanup-unmatched";
 function createCleanupCandidate(element) {
-  const normalizedText2 = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+  const normalizedText = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
   const tag = element.tagName.toLowerCase();
   if (tag === "html" || tag === "head" || tag === "body" || element.closest("[data-html-preview-cleanup-ui]")) {
     return null;
@@ -1941,7 +1954,7 @@ function createCleanupCandidate(element) {
       classes,
       ...stableId ? { id: stableId } : {},
       tag,
-      text: normalizedText2(element.textContent)
+      text: normalizedText(element.textContent)
     },
     selector
   };
@@ -1969,7 +1982,7 @@ function installCleanupRuntime(config, candidateFactory = createCleanupCandidate
     [${uiAttribute}] { font: 13px system-ui, sans-serif !important; }
   `;
   document.head.append(style);
-  const normalize2 = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+  const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
   const classScore = (element, expected) => {
     if (expected.length === 0) return 0;
     return expected.filter((name) => element.classList.contains(name)).length / expected.length;
@@ -1984,7 +1997,7 @@ function installCleanupRuntime(config, candidateFactory = createCleanupCandidate
       value += 0.2 * (attributes.filter(([name, expected]) => element.getAttribute(name) === expected).length / attributes.length);
     }
     value += 0.15 * classScore(element, fingerprint.classes);
-    const text = normalize2(element.textContent);
+    const text = normalize(element.textContent);
     if (fingerprint.text && text === fingerprint.text) value += 0.25;
     else if (fingerprint.text && (text.includes(fingerprint.text) || fingerprint.text.includes(text))) value += 0.15;
     let ancestor = element.parentElement;
@@ -3631,88 +3644,9 @@ function textNodes(root) {
 function visibleText(root) {
   return textNodes(root).map((node) => node.textContent ?? "").join("");
 }
-function normalize(value) {
-  return value.replace(/\s+/g, " ").trim();
-}
-function normalizedText(value) {
-  let text = "";
-  const starts = [];
-  const ends = [];
-  let index = 0;
-  while (index < value.length) {
-    if (!/\s/.test(value[index] ?? "")) {
-      text += value[index];
-      starts.push(index);
-      ends.push(index + 1);
-      index += 1;
-      continue;
-    }
-    const start = index;
-    while (index < value.length && /\s/.test(value[index] ?? "")) index += 1;
-    if (text.length > 0 && index < value.length) {
-      text += " ";
-      starts.push(start);
-      ends.push(index);
-    }
-  }
-  return { ends, starts, text };
-}
-function matchingContext(left, right, fromEnd) {
-  const limit = Math.min(left.length, right.length);
-  let matched = 0;
-  for (let length = 1; length <= limit; length += 1) {
-    const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
-    const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
-    if (leftPart === rightPart) matched = length;
-  }
-  return matched;
-}
-function targetContextScore(fullText, start, end, target) {
-  const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-  const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
-  return matchingContext(prefix, normalize(target.prefix ?? ""), true) + matchingContext(suffix, normalize(target.suffix ?? ""), false);
-}
-function hasContext(target) {
-  return normalize(target.prefix ?? "").length > 0 || normalize(target.suffix ?? "").length > 0;
-}
 function resolveAnnotationTarget(fullText, target) {
-  const exact = normalize(target.exact ?? "");
-  if (!exact) return null;
-  if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length && normalize(fullText.slice(target.start, target.end)) === exact) {
-    const contextLength = normalize(target.prefix ?? "").length + normalize(target.suffix ?? "").length;
-    if (hasContext(target) && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
-      return {
-        ...target,
-        prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
-        suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
-      };
-    }
-  }
-  const model = normalizedText(fullText);
-  const candidates = [];
-  let normalizedStart = model.text.indexOf(exact);
-  while (normalizedStart >= 0) {
-    const normalizedEnd = normalizedStart + exact.length;
-    const start = model.starts[normalizedStart];
-    const end = model.ends[normalizedEnd - 1];
-    if (typeof start === "number" && typeof end === "number") {
-      candidates.push({
-        end,
-        score: targetContextScore(fullText, start, end, target),
-        start
-      });
-    }
-    normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
-  }
-  candidates.sort(
-    (left, right) => right.score - left.score || Math.abs(left.start - target.start) - Math.abs(right.start - target.start)
-  );
-  const best = candidates[0];
-  const second = candidates[1];
+  const best = resolveAnnotationOffsets(fullText, target);
   if (!best) return null;
-  if (second && best.score === second.score) {
-    return null;
-  }
   return {
     end: best.end,
     exact: target.exact,

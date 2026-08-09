@@ -41,9 +41,9 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Add before/after comparison, stronger candidate grouping, and a clear restore-original action.
 - [x] `done` Improve reading experience
   - Persist scroll position, add print/PDF output, synchronized outline scrolling, image lightbox, and code-copy controls.
-- [ ] `pending` Reduce runtime drift and improve resilience
+- [ ] `in_progress` Reduce runtime drift and improve resilience
   - [x] `done` Safely recover from malformed annotation JSON without blocking previews or the sidebar.
-  - [ ] `pending` Keep DOM and iframe annotation resolution logic generated from one source.
+  - [x] `done` Keep DOM and iframe annotation resolution logic generated from one source.
   - [ ] `pending` Add annotation data migration and clearer script/resource security controls.
 
 ## Notes

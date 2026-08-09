@@ -3,6 +3,7 @@ import {
   type HtmlAnnotation,
   type HtmlAnnotationTarget
 } from "./types";
+import { resolveAnnotationOffsets } from "./locator";
 
 export interface AnnotationSelection {
   quote: string;
@@ -38,111 +39,12 @@ function visibleText(root: HTMLElement): string {
   return textNodes(root).map((node) => node.textContent ?? "").join("");
 }
 
-function normalize(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function normalizedText(value: string): {
-  ends: number[];
-  starts: number[];
-  text: string;
-} {
-  let text = "";
-  const starts: number[] = [];
-  const ends: number[] = [];
-  let index = 0;
-  while (index < value.length) {
-    if (!/\s/.test(value[index] ?? "")) {
-      text += value[index];
-      starts.push(index);
-      ends.push(index + 1);
-      index += 1;
-      continue;
-    }
-    const start = index;
-    while (index < value.length && /\s/.test(value[index] ?? "")) index += 1;
-    if (text.length > 0 && index < value.length) {
-      text += " ";
-      starts.push(start);
-      ends.push(index);
-    }
-  }
-  return { ends, starts, text };
-}
-
-function matchingContext(left: string, right: string, fromEnd: boolean): number {
-  const limit = Math.min(left.length, right.length);
-  let matched = 0;
-  for (let length = 1; length <= limit; length += 1) {
-    const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
-    const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
-    if (leftPart === rightPart) matched = length;
-  }
-  return matched;
-}
-
-function targetContextScore(
-  fullText: string,
-  start: number,
-  end: number,
-  target: HtmlAnnotationTarget
-): number {
-  const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-  const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
-  return matchingContext(prefix, normalize(target.prefix ?? ""), true) +
-    matchingContext(suffix, normalize(target.suffix ?? ""), false);
-}
-
-function hasContext(target: HtmlAnnotationTarget): boolean {
-  return normalize(target.prefix ?? "").length > 0 ||
-    normalize(target.suffix ?? "").length > 0;
-}
-
 export function resolveAnnotationTarget(
   fullText: string,
   target: HtmlAnnotationTarget
 ): HtmlAnnotationTarget | null {
-  const exact = normalize(target.exact ?? "");
-  if (!exact) return null;
-  if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
-    normalize(fullText.slice(target.start, target.end)) === exact) {
-    const contextLength = normalize(target.prefix ?? "").length +
-      normalize(target.suffix ?? "").length;
-    if (hasContext(target) && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
-      return {
-        ...target,
-        prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
-        suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
-      };
-    }
-  }
-
-  const model = normalizedText(fullText);
-  const candidates: Array<{ end: number; score: number; start: number }> = [];
-  let normalizedStart = model.text.indexOf(exact);
-  while (normalizedStart >= 0) {
-    const normalizedEnd = normalizedStart + exact.length;
-    const start = model.starts[normalizedStart];
-    const end = model.ends[normalizedEnd - 1];
-    if (typeof start === "number" && typeof end === "number") {
-      candidates.push({
-        end,
-        score: targetContextScore(fullText, start, end, target),
-        start
-      });
-    }
-    normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
-  }
-  candidates.sort((left, right) =>
-    right.score - left.score ||
-    Math.abs(left.start - target.start) - Math.abs(right.start - target.start)
-  );
-  const best = candidates[0];
-  const second = candidates[1];
+  const best = resolveAnnotationOffsets(fullText, target);
   if (!best) return null;
-  if (second && best.score === second.score) {
-    return null;
-  }
   return {
     end: best.end,
     exact: target.exact,

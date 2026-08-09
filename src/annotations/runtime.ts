@@ -1,4 +1,5 @@
 import type { HtmlAnnotation } from "./types";
+import { createAnnotationLocatorRuntimeSource } from "./locator";
 
 export const ANNOTATION_SAVE_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-save" as const;
@@ -23,6 +24,7 @@ export function createAnnotationRuntimeScript(
   renderId: string,
   annotations: readonly HtmlAnnotation[] = []
 ): string {
+  const locatorRuntimeSource = createAnnotationLocatorRuntimeSource();
   const styleText = `
     body, body * { -webkit-user-select: text !important; user-select: text !important; }
     mark[data-obsidian-html-preview-annotation] { color: inherit !important; padding: 0 .08em !important; border-radius: 2px !important; cursor: pointer !important; }
@@ -129,87 +131,8 @@ export function createAnnotationRuntimeScript(
       return position;
     };
 
-    const normalize = (value) => value.replace(/\\s+/g, " ").trim();
-
-    const normalizedText = (value) => {
-      let text = "";
-      const starts = [];
-      const ends = [];
-      let index = 0;
-      while (index < value.length) {
-        if (!/\\s/.test(value[index])) {
-          text += value[index];
-          starts.push(index);
-          ends.push(index + 1);
-          index += 1;
-          continue;
-        }
-        const start = index;
-        while (index < value.length && /\\s/.test(value[index])) index += 1;
-        if (text.length > 0 && index < value.length) {
-          text += " ";
-          starts.push(start);
-          ends.push(index);
-        }
-      }
-      return { ends, starts, text };
-    };
-
-    const matchingContext = (left, right, fromEnd) => {
-      const limit = Math.min(left.length, right.length);
-      let matched = 0;
-      for (let length = 1; length <= limit; length += 1) {
-        const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
-        const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
-        if (leftPart === rightPart) matched = length;
-      }
-      return matched;
-    };
-
-    const targetContextScore = (fullText, start, end, target) => {
-      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
-      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
-      return matchingContext(prefix, normalize(target.prefix || ""), true) +
-        matchingContext(suffix, normalize(target.suffix || ""), false);
-    };
-
-    const resolveTarget = (target) => {
-      const fullText = visibleText();
-      const exact = normalize(target.exact || "");
-      if (!exact) return null;
-      if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length &&
-          normalize(fullText.slice(target.start, target.end)) === exact) {
-        const targetPrefix = normalize(target.prefix || "");
-        const targetSuffix = normalize(target.suffix || "");
-        const contextLength = targetPrefix.length + targetSuffix.length;
-        if (contextLength > 0 && targetContextScore(fullText, target.start, target.end, target) === contextLength) {
-          return { end: target.end, start: target.start };
-        }
-      }
-
-      const model = normalizedText(fullText);
-      const candidates = [];
-      let normalizedStart = model.text.indexOf(exact);
-      while (normalizedStart >= 0) {
-        const normalizedEnd = normalizedStart + exact.length;
-        const start = model.starts[normalizedStart];
-        const end = model.ends[normalizedEnd - 1];
-        if (typeof start === "number" && typeof end === "number") {
-          candidates.push({
-            end,
-            score: targetContextScore(fullText, start, end, target),
-            start
-          });
-        }
-        normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
-      }
-      candidates.sort((left, right) => right.score - left.score ||
-        Math.abs(left.start - target.start) - Math.abs(right.start - target.start));
-      const best = candidates[0];
-      const second = candidates[1];
-      if (!best || (second && best.score === second.score)) return null;
-      return best;
-    };
+    ${locatorRuntimeSource}
+    const resolveTarget = (target) => resolveAnnotationOffsets(visibleText(), target);
 
     const rangeFromOffsets = (start, end) => {
       const startPoint = resolveOffset(start);
