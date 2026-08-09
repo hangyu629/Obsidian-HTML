@@ -137,6 +137,7 @@ export class HtmlPreviewView extends FileView {
   private annotationSubscription: (() => void) | null = null;
   private annotationViewRegistration: (() => void) | null = null;
   private activeRules: CleanupRule[] = [];
+  private suppressAnnotationRenders = 0;
   private cleanupAction: HTMLElement | null = null;
   private cleanupMode = false;
   private diagnostics: DisplayDiagnostic[] = [];
@@ -217,6 +218,7 @@ export class HtmlPreviewView extends FileView {
     this.activeRenderId = "";
     this.activeAnnotations = [];
     this.activeRules = [];
+    this.suppressAnnotationRenders = 0;
     this.unmatchedRuleIds.clear();
     this.undoStack = [];
     this.setCleanupMode(false, false);
@@ -276,6 +278,10 @@ export class HtmlPreviewView extends FileView {
     this.annotationSubscription = this.environment.annotationService.subscribe(
       sourcePath,
       () => {
+        if (this.suppressAnnotationRenders > 0) {
+          this.suppressAnnotationRenders -= 1;
+          return;
+        }
         void this.render();
       }
     );
@@ -292,6 +298,12 @@ export class HtmlPreviewView extends FileView {
       return;
     }
 
+    const previousScroll = this.frame?.contentWindow
+      ? {
+          x: this.frame.contentWindow.scrollX,
+          y: this.frame.contentWindow.scrollY
+        }
+      : null;
     const token = ++this.renderToken;
     const renderId = this.environment.createRenderId?.() ?? createRenderId();
     const allowScripts = this.environment.getSettings().allowScripts;
@@ -335,6 +347,10 @@ export class HtmlPreviewView extends FileView {
       this.unmatchedRuleIds.clear();
       this.diagnostics = result.diagnostics;
       frame.addEventListener("load", () => {
+        if (this.frame === frame && previousScroll &&
+          (previousScroll.x !== 0 || previousScroll.y !== 0)) {
+          frame.contentWindow?.scrollTo(previousScroll.x, previousScroll.y);
+        }
         if (this.frame === frame && this.cleanupMode) {
           this.postCleanupMode();
         }
@@ -458,6 +474,7 @@ export class HtmlPreviewView extends FileView {
       sourcePath
     };
     try {
+      this.suppressAnnotationRenders += 1;
       await this.environment.annotationService.save(sourcePath, annotation);
       this.activeAnnotations = [
         ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
@@ -468,6 +485,9 @@ export class HtmlPreviewView extends FileView {
         message.annotation.id ? "Annotation updated." : "Annotation added."
       );
     } catch (error) {
+      if (this.suppressAnnotationRenders > 0) {
+        this.suppressAnnotationRenders -= 1;
+      }
       this.postAnnotationResult(message.requestId, false);
       this.environment.showNotice(
         `Could not save annotation: ${
@@ -486,6 +506,7 @@ export class HtmlPreviewView extends FileView {
       return;
     }
     try {
+      this.suppressAnnotationRenders += 1;
       await this.environment.annotationService.remove(annotation);
       this.activeAnnotations = this.activeAnnotations.filter(
         (item) => item.id !== annotation.id
@@ -493,6 +514,9 @@ export class HtmlPreviewView extends FileView {
       this.postAnnotationResult(message.requestId, true);
       this.environment.showNotice("Annotation deleted.");
     } catch (error) {
+      if (this.suppressAnnotationRenders > 0) {
+        this.suppressAnnotationRenders -= 1;
+      }
       this.postAnnotationResult(message.requestId, false);
       this.environment.showNotice(
         `Could not delete annotation: ${

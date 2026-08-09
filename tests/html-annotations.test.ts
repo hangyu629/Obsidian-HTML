@@ -151,6 +151,85 @@ describe("HtmlPreviewView annotations", () => {
     expect(showNotice).toHaveBeenCalledWith("Annotation added.");
   });
 
+  it("does not rebuild the iframe after saving a local HTML annotation", async () => {
+    const listeners = new Set<() => void>();
+    const app = {
+      vault: {
+        cachedRead: vi.fn(async () => "<p>Alpha beta gamma</p>"),
+        getResourcePath: vi.fn((file: TFile) => `app://vault/${file.path}?cache=1`)
+      },
+      workspace: { openLinkText: vi.fn(async () => undefined) }
+    };
+    const annotationService = {
+      focus: vi.fn(async () => false),
+      load: vi.fn(async () => []),
+      registerView: vi.fn(() => () => undefined),
+      remove: vi.fn(async () => undefined),
+      save: vi.fn(async () => {
+        for (const listener of listeners) listener();
+      }),
+      subscribe: vi.fn((_sourcePath: string, listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      })
+    };
+    const view = new HtmlPreviewView(createLeaf(app), {
+      annotationService,
+      cleanupStore: {
+        addFileRule: vi.fn(async () => undefined),
+        loadEffective: vi.fn(async () => []),
+        promoteToFolder: vi.fn(async () => ({
+          ...validRule,
+          scope: "folder" as const,
+          sourcePath: "."
+        })),
+        removeRule: vi.fn(async () => undefined),
+        resetFileRules: vi.fn(async () => undefined)
+      },
+      coordinator: new PreviewCoordinator(0),
+      createAnnotationId: () => "11111111111111111111111111111111",
+      createRenderId: () => "render-test",
+      createRuleId: () => "fedcba9876543210fedcba9876543210",
+      getKnownVaultPaths: () => new Set(),
+      getSettings: () => ({ allowScripts: true }),
+      openExternal: vi.fn(),
+      showNotice: vi.fn()
+    });
+    document.body.append(view.containerEl);
+    view.onload();
+    await view.onLoadFile(createFile("pages/index.html"));
+    const initialFrame = view.contentEl.querySelector("iframe");
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          annotation: {
+            color: "blue",
+            comment: "important sentence",
+            quote: "Alpha beta",
+            target: {
+              end: 10,
+              exact: "Alpha beta",
+              prefix: "",
+              start: 0,
+              suffix: " gamma"
+            }
+          },
+          renderId: "render-test",
+          requestId: "save-keep-frame",
+          type: ANNOTATION_SAVE_MESSAGE_TYPE
+        },
+        source: initialFrame?.contentWindow ?? null
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(annotationService.save).toHaveBeenCalled();
+    });
+    expect(view.contentEl.querySelector("iframe")).toBe(initialFrame);
+    expect(app.vault.cachedRead).toHaveBeenCalledTimes(1);
+  });
+
   it("deletes an existing annotation and rejects unknown colors", async () => {
     const existing = existingAnnotation();
     const { annotationService, view } = createHarness([existing]);

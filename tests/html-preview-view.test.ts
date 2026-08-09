@@ -160,6 +160,29 @@ describe("HtmlPreviewView", () => {
     expect(view.contentEl.classList.contains("html-preview-view")).toBe(true);
   });
 
+  it("restores the iframe scroll position after a rerender", async () => {
+    const { view } = createHarness();
+    await view.onLoadFile(createFile("pages/index.html"));
+    const firstFrame = view.contentEl.querySelector("iframe")!;
+    Object.defineProperty(firstFrame.contentWindow!, "scrollX", {
+      configurable: true,
+      value: 24
+    });
+    Object.defineProperty(firstFrame.contentWindow!, "scrollY", {
+      configurable: true,
+      value: 420
+    });
+
+    await view.reload();
+    const secondFrame = view.contentEl.querySelector("iframe")!;
+    const scrollTo = vi.fn();
+    secondFrame.contentWindow!.scrollTo = scrollTo;
+
+    secondFrame.dispatchEvent(new Event("load"));
+
+    expect(scrollTo).toHaveBeenCalledWith(24, 420);
+  });
+
   it("loads effective cleanup rules into the preview runtime", async () => {
     const cleanupStore = createCleanupStore([validRule]);
     const { view } = createHarness(undefined, true, cleanupStore);
