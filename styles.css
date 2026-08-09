@@ -393,6 +393,7 @@
   position: relative;
   display: block;
   width: 100%;
+  height: auto;
   min-width: 0;
   padding: 10px 10px 10px 17px;
   overflow: hidden;
@@ -404,6 +405,7 @@
   font: inherit;
   letter-spacing: 0;
   text-align: left;
+  white-space: normal;
 }
 
 .annotation-sidebar-item::before {
@@ -484,6 +486,7 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: 5px;
   background: var(--background-primary-alt);
+  white-space: normal;
 }
 
 .annotation-sidebar-comment-label {
@@ -496,11 +499,14 @@
 }
 
 .annotation-sidebar-comment {
+  display: block;
+  max-width: 100%;
   margin-top: 0;
   -webkit-line-clamp: 4;
   color: var(--text-normal);
   font-size: var(--font-ui-small);
   line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .annotation-sidebar-highlight-label {

@@ -93,6 +93,8 @@ describe("AnnotationSidebarView", () => {
       .toBe("Follow this idea");
     expect(items[1]?.querySelector(".annotation-sidebar-comment-label")?.textContent)
       .toBe("批注");
+    expect(items[1]?.querySelector(".annotation-sidebar-note")?.textContent)
+      .toContain("Follow this idea");
     expect(items[0]?.querySelector(".annotation-sidebar-highlight-label")?.textContent)
       .toBe("仅高亮");
   });
@@ -151,5 +153,6 @@ describe("AnnotationSidebarView", () => {
     expect(css).toContain('.annotation-sidebar-item[data-annotation-color="pink"]');
     expect(css).toContain('.annotation-sidebar-item[data-annotation-color="violet"]');
     expect(css).toContain(".annotation-sidebar-item.is-unresolved");
+    expect(css).toContain("white-space: normal");
   });
 });

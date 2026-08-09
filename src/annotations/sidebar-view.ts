@@ -181,18 +181,18 @@ export class AnnotationSidebarView extends ItemView {
     quote.textContent = annotation.quote;
     item.append(quote);
     if (annotation.comment.trim()) {
-      const note = document.createElement("span");
+      const note = document.createElement("div");
       note.className = "annotation-sidebar-note";
-      const label = document.createElement("span");
+      const label = document.createElement("div");
       label.className = "annotation-sidebar-comment-label";
       label.textContent = "批注";
-      const comment = document.createElement("span");
+      const comment = document.createElement("div");
       comment.className = "annotation-sidebar-comment";
       comment.textContent = annotation.comment;
       note.append(label, comment);
       item.append(note);
     } else {
-      const label = document.createElement("span");
+      const label = document.createElement("div");
       label.className = "annotation-sidebar-highlight-label";
       label.textContent = "仅高亮";
       item.append(label);
