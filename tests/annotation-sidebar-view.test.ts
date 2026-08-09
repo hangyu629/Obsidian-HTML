@@ -125,6 +125,34 @@ describe("AnnotationSidebarView", () => {
     expect(view.contentEl.querySelectorAll(".annotation-sidebar-item")).toHaveLength(2);
   });
 
+  it("supports changing sort order and bulk deleting filtered annotations", async () => {
+    const { annotationService, view } = harness();
+    await view.setSource("notes/a.md");
+
+    const sort = view.contentEl.querySelector<HTMLSelectElement>(
+      '[aria-label="Annotation sort order"]'
+    )!;
+    sort.value = "newest";
+    sort.dispatchEvent(new Event("change", { bubbles: true }));
+    expect([
+      ...view.contentEl.querySelectorAll<HTMLElement>(".annotation-sidebar-item")
+    ].map((item) => item.querySelector(".annotation-sidebar-quote")?.textContent)).toEqual([
+      "Gamma",
+      "beta",
+      "Alpha"
+    ]);
+
+    clickByText(view.contentEl, "有批注");
+    document.body.replaceChildren(view.containerEl);
+    view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Delete filtered annotations"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(annotationService.remove).toHaveBeenCalledTimes(2);
+    });
+    expect(view.contentEl.querySelectorAll(".annotation-sidebar-item")).toHaveLength(0);
+    expect(view.contentEl.textContent).toContain("没有符合当前筛选条件的注释");
+  });
+
   it("focuses a clicked annotation and marks unresolved anchors", async () => {
     const { annotationService, showNotice, view } = harness(false);
     await view.setSource("notes/a.md");

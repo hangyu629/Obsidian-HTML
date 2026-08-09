@@ -360,6 +360,28 @@
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
+.annotation-sidebar-management {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 10px;
+}
+
+.annotation-sidebar-sort {
+  min-width: 120px;
+  min-height: 30px;
+}
+
+.annotation-sidebar-bulk-delete {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-normal);
+  background: var(--background-primary);
+}
+
 .annotation-sidebar-filter {
   min-height: 28px;
   padding: 4px 9px;

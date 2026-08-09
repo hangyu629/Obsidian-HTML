@@ -7,6 +7,7 @@ import { annotationDisplayColor, type HtmlAnnotation } from "./types";
 export const ANNOTATION_SIDEBAR_VIEW_TYPE = "html-preview-annotations";
 
 type AnnotationFilter = "all" | "comments" | "highlights";
+type AnnotationSort = "document" | "newest";
 
 export interface AnnotationSidebarEnvironment {
   annotationService: Pick<AnnotationService, "load" | "subscribe">;
@@ -19,6 +20,7 @@ export interface AnnotationSidebarEnvironment {
 export class AnnotationSidebarView extends ItemView {
   private annotations: HtmlAnnotation[] = [];
   private filter: AnnotationFilter = "all";
+  private sort: AnnotationSort = "document";
   private loadToken = 0;
   private sourcePath: string | null = null;
   private unsubscribe: (() => void) | null = null;
@@ -145,6 +147,33 @@ export class AnnotationSidebarView extends ItemView {
     }
     fragment.append(filters);
 
+    const management = document.createElement("div");
+    management.className = "annotation-sidebar-management";
+    const sort = document.createElement("select");
+    sort.className = "annotation-sidebar-sort";
+    sort.setAttribute("aria-label", "Annotation sort order");
+    for (const [value, label] of [
+      ["document", "文档顺序"],
+      ["newest", "最新优先"]
+    ] as const) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      sort.append(option);
+    }
+    sort.value = this.sort;
+    sort.addEventListener("change", () => {
+      this.sort = sort.value === "newest" ? "newest" : "document";
+      this.render();
+    });
+    const bulkDelete = document.createElement("button");
+    bulkDelete.type = "button";
+    bulkDelete.className = "annotation-sidebar-bulk-delete";
+    bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
+    bulkDelete.textContent = "删除当前筛选";
+    management.append(sort, bulkDelete);
+    fragment.append(management);
+
     if (error) {
       fragment.append(this.empty(error));
       this.contentEl.replaceChildren(fragment);
@@ -156,6 +185,20 @@ export class AnnotationSidebarView extends ItemView {
       return this.filter === "all" ||
         (this.filter === "comments" && hasComment) ||
         (this.filter === "highlights" && !hasComment);
+    }).sort((left, right) =>
+      this.sort === "newest"
+        ? right.target.start - left.target.start
+        : left.target.start - right.target.start
+    );
+    bulkDelete.disabled = visible.length === 0;
+    bulkDelete.addEventListener("click", () => {
+      bulkDelete.disabled = true;
+      void Promise.all(visible.map((annotation) => this.environment.removeAnnotation(annotation)))
+        .catch((error) => {
+          this.environment.showNotice(
+            error instanceof Error ? error.message : String(error)
+          );
+        });
     });
     if (visible.length === 0) {
       fragment.append(this.empty(

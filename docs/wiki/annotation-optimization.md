@@ -16,7 +16,7 @@ Status legend:
 - [x] `done` Sync sidebar save/delete changes back to the main reading surface immediately
 - [x] `done` Preserve sidebar annotation source when switching to another right-side tab
 - [x] `done` Polish the sidebar annotation edit modal
-- [ ] `pending` Add clearer bulk and management actions for the sidebar
+- [x] `done` Add clearer bulk and management actions for the sidebar
 - [ ] `pending` Add annotation export to Markdown
 - [ ] `pending` Harden re-anchor heuristics for repeated quotes and larger text rewrites
 

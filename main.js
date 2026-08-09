@@ -312,6 +312,7 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
   environment;
   annotations = [];
   filter = "all";
+  sort = "document";
   loadToken = 0;
   sourcePath = null;
   unsubscribe = null;
@@ -420,6 +421,32 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
       filters.append(button);
     }
     fragment.append(filters);
+    const management = document.createElement("div");
+    management.className = "annotation-sidebar-management";
+    const sort = document.createElement("select");
+    sort.className = "annotation-sidebar-sort";
+    sort.setAttribute("aria-label", "Annotation sort order");
+    for (const [value, label] of [
+      ["document", "\u6587\u6863\u987A\u5E8F"],
+      ["newest", "\u6700\u65B0\u4F18\u5148"]
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      sort.append(option);
+    }
+    sort.value = this.sort;
+    sort.addEventListener("change", () => {
+      this.sort = sort.value === "newest" ? "newest" : "document";
+      this.render();
+    });
+    const bulkDelete = document.createElement("button");
+    bulkDelete.type = "button";
+    bulkDelete.className = "annotation-sidebar-bulk-delete";
+    bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
+    bulkDelete.textContent = "\u5220\u9664\u5F53\u524D\u7B5B\u9009";
+    management.append(sort, bulkDelete);
+    fragment.append(management);
     if (error) {
       fragment.append(this.empty(error));
       this.contentEl.replaceChildren(fragment);
@@ -428,6 +455,17 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     const visible = this.annotations.filter((annotation) => {
       const hasComment = annotation.comment.trim().length > 0;
       return this.filter === "all" || this.filter === "comments" && hasComment || this.filter === "highlights" && !hasComment;
+    }).sort(
+      (left, right) => this.sort === "newest" ? right.target.start - left.target.start : left.target.start - right.target.start
+    );
+    bulkDelete.disabled = visible.length === 0;
+    bulkDelete.addEventListener("click", () => {
+      bulkDelete.disabled = true;
+      void Promise.all(visible.map((annotation) => this.environment.removeAnnotation(annotation))).catch((error2) => {
+        this.environment.showNotice(
+          error2 instanceof Error ? error2.message : String(error2)
+        );
+      });
     });
     if (visible.length === 0) {
       fragment.append(this.empty(
