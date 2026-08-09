@@ -1,7 +1,7 @@
 {
   "name": "obsidian-html",
   "version": "0.3.0",
-  "description": "Preview and non-destructively clean up HTML files in Obsidian.",
+  "description": "Preview, clean up, annotate, and save HTML reading pages in Obsidian.",
   "private": true,
   "type": "module",
   "scripts": {

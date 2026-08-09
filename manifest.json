@@ -3,7 +3,7 @@
   "name": "Obsidian HTML",
   "version": "0.3.0",
   "minAppVersion": "1.5.0",
-  "description": "Preview and non-destructively clean up HTML and HTM files in your vault.",
+  "description": "Preview, clean up, annotate, and save HTML and HTM reading pages in your vault.",
   "author": "Hangyu",
   "isDesktopOnly": false
 }

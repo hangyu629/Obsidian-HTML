@@ -31,7 +31,7 @@ Status legend:
 
 Items are ordered by user value and implementation dependency. Each item should be moved to `in_progress` before coding and to `done` only after automated verification and a local Vault build.
 
-- [ ] `in_progress` Add a smart reading mode for saved HTML pages
+- [ ] `verify` Add a smart reading mode for saved HTML pages
   - Extract the main article with Mozilla Readability and render it in a consistent, polished reading layout.
   - Apply the existing saved cleanup rules before article extraction so manual cleanup remains the fallback when automatic extraction includes unwanted regions.
   - Keep the original HTML preview and all existing cleanup controls available; smart reading starts as a reversible view mode.

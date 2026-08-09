@@ -6,7 +6,7 @@
 
 ## English
 
-HTML Preview makes HTML a first-class file type in Obsidian. Copy an externally saved or generated web page into your Vault, then open, preview, clean up, and annotate it without changing the original HTML file.
+HTML Preview makes HTML a first-class file type in Obsidian. Copy an externally saved or generated web page into your Vault, then open, preview, clean up, annotate, and optionally save it as a clean standalone reading page.
 
 ### Features
 
@@ -15,6 +15,7 @@ HTML Preview makes HTML a first-class file type in Obsidian. Copy an externally 
 - Refresh open previews when the HTML file or a discovered local dependency changes.
 - Run page scripts in a sandboxed iframe that cannot access Obsidian, Node.js, or Electron APIs.
 - Hide unwanted sidebars, footers, banners, and other page regions with reversible file- or folder-scoped cleanup rules.
+- Extract saved HTML into a polished Smart reading view, then optionally replace the current HTML with the clean reading page after confirmation.
 - Select text in HTML Preview or Enhanced Markdown Reading to add one of five highlight colors or a text annotation.
 - Browse excerpts, comments, and highlight-only items in the right-side Annotation pane; select an item to locate it in the document.
 - Render Markdown through Obsidian's native `MarkdownRenderer`, then apply configurable reading layouts and themes.
@@ -59,12 +60,14 @@ The repository tracks the Obsidian release files: `main.js`, `manifest.json`, an
 4. Use **Clean up page** in the toolbar, select an unwanted region, and hide it.
 5. Use **Undo cleanup** for the latest cleanup in the current view, or use **Manage cleanup rules** to restore, reset, or promote saved rules.
    Use **View original page** to temporarily compare the untouched page; this does not remove saved cleanup rules.
-6. Select page text and use the contextual **Color** or **Comment** action. Click an existing highlight to change its color, edit its comment, or delete it.
-7. Run **Open annotation sidebar** from the command palette to browse and locate annotations for the current file. The pane is restored automatically when the plugin is re-enabled.
-8. In the Annotation pane, use the search icon or **Search annotations across the Vault** to search excerpts, comments, and source paths. Filter by folder, color, or annotation type, then select a result to open and locate it.
-9. Use the item actions to edit, copy, repair, or delete an annotation. **Repair** keeps the annotation's ID, color, and comment while you select a replacement passage. The management row also supports filtered bulk color changes and Markdown export.
+6. Use **Smart reading** to extract the article into a cleaner reading layout. If the extraction still includes noise, return to normal preview, add more cleanup rules, and reopen Smart reading.
+7. Use **Save reading page** only after you like the extracted result. The plugin writes a hidden backup first, then replaces the current HTML with the clean standalone reading page. Use **Restore original page** to recover that backup later.
+8. Select page text and use the contextual **Color** or **Comment** action. Click an existing highlight to change its color, edit its comment, or delete it.
+9. Run **Open annotation sidebar** from the command palette to browse and locate annotations for the current file. The pane is restored automatically when the plugin is re-enabled.
+10. In the Annotation pane, use the search icon or **Search annotations across the Vault** to search excerpts, comments, and source paths. Filter by folder, color, or annotation type, then select a result to open and locate it.
+11. Use the item actions to edit, copy, repair, or delete an annotation. **Repair** keeps the annotation's ID, color, and comment while you select a replacement passage. The management row also supports filtered bulk color changes and Markdown export.
 
-Page cleanup and HTML annotations require **Allow page JavaScript** in the plugin settings. When disabled, HTML files still render, but page scripts, cleanup replay, and HTML annotation interactions are disabled.
+Page cleanup in normal HTML preview requires **Allow page JavaScript** because the original page runtime is interactive. Smart reading never runs source-page scripts and still keeps the plugin's own annotation bridge active.
 
 ### Enhanced Markdown Reading
 
@@ -116,15 +119,16 @@ Templates may contain HTML, CSS, themes, and local assets. Template scripts, ext
 
 ### Data and Sync
 
-The plugin never rewrites HTML or Markdown source files. Cleanup rules and annotations are stored in hidden Vault paths:
+Enhanced Markdown Reading still never rewrites Markdown source files. HTML source files are only rewritten when you explicitly confirm **Save reading page** or **Restore original page**. Cleanup rules, backups, and annotations are stored in hidden Vault paths:
 
 ```text
 .html-preview/cleanup/pages/<HTML path>.json
 .html-preview/cleanup/folder-rules.json
+.html-preview/originals/<HTML path>
 .html-preview/annotations/pages/<source path>.json
 ```
 
-Each annotation stores its excerpt, surrounding text, offsets, and optional comment. If a substantially rewritten source document leaves an annotation unresolved, choose **Repair** in the Annotation pane, select replacement text, and save the updated target. Whether these files sync depends on whether your sync provider includes hidden folders.
+Each annotation stores its excerpt, surrounding text, offsets, and optional comment. Saved reading pages do not embed annotation markup or comment text; annotations remain in the hidden sidecar JSON and re-anchor after the file is replaced. If a substantially rewritten source document leaves an annotation unresolved, choose **Repair** in the Annotation pane, select replacement text, and save the updated target. Whether these files sync depends on whether your sync provider includes hidden folders.
 Malformed annotation data is ignored safely so it does not prevent the source file or Annotation pane from opening.
 
 ### Security and Compatibility
@@ -137,8 +141,9 @@ The preview base URL is the HTML file's Vault folder. Standard relative resource
 
 ```text
 src/main.ts                       Plugin entry point, view registration, and workspace lifecycle
-src/html-preview-view.ts          HTML iframe preview, cleanup, and HTML annotations
+src/html-preview-view.ts          HTML iframe preview, smart reading workflow, cleanup, and HTML annotations
 src/markdown/                     Enhanced Markdown rendering, templates, and themes
+src/reader/                       Readability extraction, reader document generation, backups, and confirmation modals
 src/annotations/                  Annotation persistence, contextual UI, runtime, and sidebar
 src/cleanup/                      Page-cleanup rules and runtime
 src/preview/                      Preview document building, dependencies, and navigation
@@ -156,7 +161,7 @@ This project is released under the [MIT License](LICENSE). You may use, copy, mo
 
 ## 中文
 
-HTML Preview 让 HTML 成为 Obsidian 中的一等文件类型。将外部保存或生成的网页复制到 Vault 后，即可直接打开、预览、清理和批注，且不会改写原始 HTML 文件。
+HTML Preview 让 HTML 成为 Obsidian 中的一等文件类型。将外部保存或生成的网页复制到 Vault 后，即可直接打开、预览、清理、批注，并在需要时保存为干净的独立阅读页。
 
 ### 功能
 
@@ -165,6 +170,7 @@ HTML Preview 让 HTML 成为 Obsidian 中的一等文件类型。将外部保存
 - HTML 文件或已发现的本地依赖变化时，自动刷新已打开的预览。
 - 在隔离 iframe 中运行页面脚本，脚本不能访问 Obsidian、Node.js 或 Electron API。
 - 通过可恢复的文件级或文件夹级清理规则，隐藏侧栏、页脚、横幅等无用区域。
+- 将保存的 HTML 提取成更精美的 Smart reading 视图，并在确认后把当前 HTML 替换为干净的阅读页。
 - 在 HTML 预览或增强 Markdown 阅读中选择文字，添加五种颜色的高亮或文字批注。
 - 在右侧“注释”栏查看当前文件的原文摘录、批注正文和仅高亮项目，点击条目即可定位正文。
 - 使用 Obsidian 原生 `MarkdownRenderer` 渲染 Markdown，再应用可配置的阅读布局和主题。
@@ -209,12 +215,14 @@ npm run check     # 测试、类型检查、生产构建和发布校验
 4. 使用视图工具栏中的 **Clean up page**，选择并隐藏不需要的页面区域。
 5. 使用 **Undo cleanup** 撤销当前视图中的最近一次清理，或使用 **Manage cleanup rules** 恢复、清空或提升已保存的规则。
    使用 **View original page** 可以临时对比未清理的原始页面，不会删除已保存的清理规则。
-6. 选择页面文字，使用浮动的 **颜色** 或 **注释** 操作。点击已有高亮可以修改颜色、编辑批注或删除。
-7. 从命令面板执行 **Open annotation sidebar**，在右侧浏览并定位当前文件的批注。插件重新启用后，侧栏会自动恢复。
-8. 在“注释”栏点击搜索图标，或从命令面板执行 **Search annotations across the Vault**，即可搜索摘录、批注正文和来源文件。支持按文件夹、颜色和批注类型筛选，点击结果会打开并定位原文。
-9. 每条批注支持编辑、复制、重新定位和删除。**重新定位**会保留批注 ID、颜色和正文，只需重新选择对应的新文本并保存。管理栏还支持按当前筛选结果批量改色和导出 Markdown。
+6. 使用 **Smart reading** 将页面正文提取成更干净的阅读布局。如果自动提取后仍有噪音，返回普通预览补充清理规则，再重新打开 Smart reading。
+7. 只有在你确认提取结果满意后，才使用 **Save reading page**。插件会先写入隐藏备份，再将当前 HTML 替换为干净的独立阅读页。之后可通过 **Restore original page** 恢复备份。
+8. 选择页面文字，使用浮动的 **颜色** 或 **注释** 操作。点击已有高亮可以修改颜色、编辑批注或删除。
+9. 从命令面板执行 **Open annotation sidebar**，在右侧浏览并定位当前文件的批注。插件重新启用后，侧栏会自动恢复。
+10. 在“注释”栏点击搜索图标，或从命令面板执行 **Search annotations across the Vault**，即可搜索摘录、批注正文和来源文件。支持按文件夹、颜色和批注类型筛选，点击结果会打开并定位原文。
+11. 每条批注支持编辑、复制、重新定位和删除。**重新定位**会保留批注 ID、颜色和正文，只需重新选择对应的新文本并保存。管理栏还支持按当前筛选结果批量改色和导出 Markdown。
 
-页面清理和 HTML 批注依赖插件设置中的 **Allow page JavaScript**。关闭后，HTML 文件仍可预览，但页面脚本、清理规则回放和 HTML 批注交互会被禁用。
+普通 HTML 预览中的页面清理依赖插件设置里的 **Allow page JavaScript**，因为原网页运行时需要交互。Smart reading 永远不会执行原网页脚本，但仍会保留插件自己的批注桥接。
 
 ### 增强 Markdown 阅读
 
@@ -266,15 +274,16 @@ html-preview.theme: dark
 
 ### 数据与同步
 
-插件不会改写 HTML 或 Markdown 源文件。清理规则和批注保存在 Vault 的隐藏目录：
+增强 Markdown 阅读依然不会改写 Markdown 源文件。HTML 源文件只会在你明确确认 **Save reading page** 或 **Restore original page** 时被改写。清理规则、备份和批注保存在 Vault 的隐藏目录：
 
 ```text
 .html-preview/cleanup/pages/<HTML path>.json
 .html-preview/cleanup/folder-rules.json
+.html-preview/originals/<HTML path>
 .html-preview/annotations/pages/<source path>.json
 ```
 
-每条批注会保存摘录、前后文、文本位置和可选批注正文。源文档发生大幅改写后，批注可能无法定位；此时可在“注释”栏点击 **重新定位**，选择新的对应文本后保存。是否同步这些文件，取决于同步工具是否包含隐藏目录。
+每条批注会保存摘录、前后文、文本位置和可选批注正文。保存后的阅读页不会把批注正文直接写进 HTML，批注仍保存在隐藏的 sidecar JSON 中，并会在文件被替换后重新定位。源文档发生大幅改写后，批注可能无法定位；此时可在“注释”栏点击 **重新定位**，选择新的对应文本后保存。是否同步这些文件，取决于同步工具是否包含隐藏目录。
 格式损坏的批注数据会被安全忽略，不会阻止源文件或“注释”栏打开。
 
 ### 安全与兼容性
@@ -287,8 +296,9 @@ html-preview.theme: dark
 
 ```text
 src/main.ts                       插件入口、视图注册与工作区生命周期
-src/html-preview-view.ts          HTML iframe 预览、清理和 HTML 批注
+src/html-preview-view.ts          HTML iframe 预览、Smart reading 工作流、清理和 HTML 批注
 src/markdown/                     增强 Markdown 渲染、模板和主题
+src/reader/                       Readability 提取、阅读页生成、备份和确认弹窗
 src/annotations/                  批注存储、浮动操作栏、运行时和右侧栏
 src/cleanup/                      页面清理规则与清理运行时
 src/preview/                      预览文档构建、依赖和导航
