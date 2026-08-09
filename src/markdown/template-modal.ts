@@ -1,10 +1,12 @@
 import { Modal, type App } from "obsidian";
 
 import type { MarkdownTemplateSummary } from "./templates/types";
+import type { TemplateSelection } from "./rules";
 
 export interface MarkdownTemplateModalEnvironment {
   list(): Promise<MarkdownTemplateSummary[]>;
   onSelect(selection: { templateId: string; themeId: string }): void;
+  selected?: TemplateSelection;
 }
 
 export class MarkdownTemplateModal extends Modal {
@@ -29,10 +31,26 @@ export class MarkdownTemplateModal extends Modal {
     try {
       const templates = await this.environment.list();
       const fragment = document.createDocumentFragment();
+      const selected = this.environment.selected;
+      if (selected) {
+        const current = templates.find((template) => template.id === selected.templateId);
+        const summary = document.createElement("p");
+        summary.className = "enhanced-markdown-template-current";
+        const source = selected.source === "frontmatter"
+          ? "frontmatter"
+          : selected.source === "folder"
+            ? "文件夹规则"
+            : "默认设置";
+        summary.textContent = current
+          ? `当前：${current.name} / ${current.themeNames?.[selected.themeId] ?? selected.themeId}（${source}）`
+          : `当前：${selected.templateId} / ${selected.themeId}（${source}）`;
+        fragment.append(summary);
+      }
       for (const template of templates) {
         const section = document.createElement("section");
         section.className = "enhanced-markdown-template-card";
         section.dataset.templateId = template.id;
+        if (selected?.templateId === template.id) section.dataset.selected = "true";
         const header = document.createElement("div");
         header.className = "enhanced-markdown-template-card-header";
         const heading = document.createElement("h3");
@@ -56,6 +74,9 @@ export class MarkdownTemplateModal extends Modal {
           button.type = "button";
           button.dataset.templateId = template.id;
           button.dataset.themeId = themeId;
+          button.setAttribute("aria-pressed", String(
+            selected?.templateId === template.id && selected.themeId === themeId
+          ));
           button.textContent = template.themeNames?.[themeId] ?? themeId;
           button.title = `Use ${template.name} with ${button.textContent}`;
           button.addEventListener("click", () => {

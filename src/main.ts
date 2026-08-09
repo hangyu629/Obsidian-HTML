@@ -111,8 +111,8 @@ export default class HtmlPreviewPlugin extends Plugin {
           onReturnToMarkdown: (path) => {
             this.nativeMarkdownPaths.set(leaf, path);
           },
-          onSwitchTemplate: (path) => {
-            this.openTemplateChooser(path);
+          onSwitchTemplate: (path, selected) => {
+            this.openTemplateChooser(path, selected);
           },
           resolveAsset: (path) => {
             const file = this.app.vault.getAbstractFileByPath(path);
@@ -426,12 +426,16 @@ export default class HtmlPreviewPlugin extends Plugin {
     );
   }
 
-  private openTemplateChooser(sourcePath: string): void {
+  private openTemplateChooser(
+    sourcePath: string,
+    selected: import("./markdown/rules").TemplateSelection | null = null
+  ): void {
     new MarkdownTemplateModal(this.app, {
       list: () => this.markdownTemplateCatalog.list(),
       onSelect: (selection) => {
         void this.openEnhancedMarkdown(sourcePath, "manual", undefined, selection);
-      }
+      },
+      selected: selected ?? undefined
     }).open();
   }
 

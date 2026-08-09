@@ -4682,7 +4682,10 @@ var EnhancedMarkdownView = class extends import_obsidian9.FileView {
       void this.openMarkdownMarkdown();
     });
     this.addAction("palette", "Template & theme", () => {
-      if (this.file) void this.environment.onSwitchTemplate?.(this.file.path);
+      if (this.file) void this.environment.onSwitchTemplate?.(
+        this.file.path,
+        this.sessionSelection
+      );
     });
     this.annotationUi = new AnnotationContextualUi(this.contentEl, {
       onDelete: (annotation) => this.deleteAnnotation(annotation),
@@ -5086,10 +5089,20 @@ var MarkdownTemplateModal = class extends import_obsidian10.Modal {
     try {
       const templates = await this.environment.list();
       const fragment = document.createDocumentFragment();
+      const selected = this.environment.selected;
+      if (selected) {
+        const current = templates.find((template) => template.id === selected.templateId);
+        const summary = document.createElement("p");
+        summary.className = "enhanced-markdown-template-current";
+        const source = selected.source === "frontmatter" ? "frontmatter" : selected.source === "folder" ? "\u6587\u4EF6\u5939\u89C4\u5219" : "\u9ED8\u8BA4\u8BBE\u7F6E";
+        summary.textContent = current ? `\u5F53\u524D\uFF1A${current.name} / ${current.themeNames?.[selected.themeId] ?? selected.themeId}\uFF08${source}\uFF09` : `\u5F53\u524D\uFF1A${selected.templateId} / ${selected.themeId}\uFF08${source}\uFF09`;
+        fragment.append(summary);
+      }
       for (const template of templates) {
         const section = document.createElement("section");
         section.className = "enhanced-markdown-template-card";
         section.dataset.templateId = template.id;
+        if (selected?.templateId === template.id) section.dataset.selected = "true";
         const header = document.createElement("div");
         header.className = "enhanced-markdown-template-card-header";
         const heading = document.createElement("h3");
@@ -5113,6 +5126,9 @@ var MarkdownTemplateModal = class extends import_obsidian10.Modal {
           button.type = "button";
           button.dataset.templateId = template.id;
           button.dataset.themeId = themeId;
+          button.setAttribute("aria-pressed", String(
+            selected?.templateId === template.id && selected.themeId === themeId
+          ));
           button.textContent = template.themeNames?.[themeId] ?? themeId;
           button.title = `Use ${template.name} with ${button.textContent}`;
           button.addEventListener("click", () => {
@@ -5198,8 +5214,8 @@ var HtmlPreviewPlugin = class extends import_obsidian11.Plugin {
         onReturnToMarkdown: (path) => {
           this.nativeMarkdownPaths.set(leaf, path);
         },
-        onSwitchTemplate: (path) => {
-          this.openTemplateChooser(path);
+        onSwitchTemplate: (path, selected) => {
+          this.openTemplateChooser(path, selected);
         },
         resolveAsset: (path) => {
           const file = this.app.vault.getAbstractFileByPath(path);
@@ -5473,12 +5489,13 @@ var HtmlPreviewPlugin = class extends import_obsidian11.Plugin {
       { history: true }
     );
   }
-  openTemplateChooser(sourcePath) {
+  openTemplateChooser(sourcePath, selected = null) {
     new MarkdownTemplateModal(this.app, {
       list: () => this.markdownTemplateCatalog.list(),
       onSelect: (selection) => {
         void this.openEnhancedMarkdown(sourcePath, "manual", void 0, selection);
-      }
+      },
+      selected: selected ?? void 0
     }).open();
   }
   async exportAnnotations(sourcePath, annotations) {

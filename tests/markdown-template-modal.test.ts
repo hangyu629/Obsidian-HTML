@@ -16,7 +16,8 @@ describe("MarkdownTemplateModal", () => {
           themeNames: { light: "Light paper", dark: "Dark forest" }
         }
       ]),
-      onSelect
+      onSelect,
+      selected: { source: "folder", templateId: "book-editorial", themeId: "dark" }
     });
 
     modal.open();
@@ -24,6 +25,7 @@ describe("MarkdownTemplateModal", () => {
     expect(modal.contentEl.querySelector(".enhanced-markdown-template-card")).not.toBeNull();
     expect(modal.contentEl.textContent).toContain("Book-like single-column reading");
     expect(modal.contentEl.textContent).toContain("Dark forest");
+    expect(modal.contentEl.textContent).toContain("当前：Book Editorial / Dark forest（文件夹规则）");
     await Promise.resolve();
     const button = modal.contentEl.querySelector("button[data-template-id=book-editorial][data-theme-id=dark]");
     expect(button).not.toBeNull();

@@ -32,7 +32,10 @@ export interface EnhancedMarkdownViewEnvironment {
   getFrontmatter(file: TFile): unknown;
   loadTemplate(templateId: string): Promise<MarkdownTemplatePackage>;
   onReturnToMarkdown?(sourcePath: string): void;
-  onSwitchTemplate?(sourcePath: string): void | Promise<void>;
+  onSwitchTemplate?(
+    sourcePath: string,
+    selected: TemplateSelection | null
+  ): void | Promise<void>;
   resolveAsset?(vaultPath: string): string | null;
   resolveTemplate(
     sourcePath: string,
@@ -121,7 +124,10 @@ export class EnhancedMarkdownView extends FileView {
       void this.openMarkdownMarkdown();
     });
     this.addAction("palette", "Template & theme", () => {
-      if (this.file) void this.environment.onSwitchTemplate?.(this.file.path);
+      if (this.file) void this.environment.onSwitchTemplate?.(
+        this.file.path,
+        this.sessionSelection
+      );
     });
     this.annotationUi = new AnnotationContextualUi(this.contentEl, {
       onDelete: (annotation) => this.deleteAnnotation(annotation),

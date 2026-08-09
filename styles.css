@@ -798,6 +798,19 @@
   background: var(--background-secondary);
 }
 
+.enhanced-markdown-template-current {
+  margin: 0 0 var(--size-4-3);
+  padding: var(--size-4-2) var(--size-4-3);
+  border-left: 3px solid var(--interactive-accent);
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  font-size: var(--font-ui-small);
+}
+
+.enhanced-markdown-template-card[data-selected="true"] {
+  border-color: var(--interactive-accent);
+}
+
 .enhanced-markdown-template-card-header {
   display: flex;
   align-items: center;
@@ -827,6 +840,11 @@
 
 .enhanced-markdown-template-themes button {
   min-width: 7rem;
+}
+
+.enhanced-markdown-template-themes button[aria-pressed="true"] {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
 }
 
 .setting-item:has(select[data-folder-template]) .setting-item-control {
