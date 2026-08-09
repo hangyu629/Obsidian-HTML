@@ -168,7 +168,7 @@ describe("AnnotationSidebarView", () => {
       .toBe(true);
   });
 
-  it("supports changing sort order and bulk deleting filtered annotations", async () => {
+  it("changes sort order and confirms before deleting filtered annotations", async () => {
     const { annotationService, view } = harness();
     await view.setSource("notes/a.md");
 
@@ -187,7 +187,16 @@ describe("AnnotationSidebarView", () => {
 
     clickByText(view.contentEl, "有批注");
     document.body.replaceChildren(view.containerEl);
+    view.contentEl.querySelector<HTMLButtonElement>(
+      '[aria-label="Manage annotations"]'
+    )?.click();
     view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Delete filtered annotations"]')?.click();
+
+    expect(annotationService.remove).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("将删除 2 条注释");
+    document.body.querySelector<HTMLButtonElement>(
+      '[aria-label="Confirm deleting filtered annotations"]'
+    )?.click();
 
     await vi.waitFor(() => {
       expect(annotationService.remove).toHaveBeenCalledTimes(2);

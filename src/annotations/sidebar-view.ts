@@ -1,6 +1,7 @@
 import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
 
 import type { AnnotationService } from "./annotation-service";
+import { AnnotationSidebarBulkDeleteModal } from "./sidebar-bulk-delete-modal";
 import { AnnotationSidebarEditModal } from "./sidebar-edit-modal";
 import { annotationDisplayColor, type HtmlAnnotation } from "./types";
 
@@ -283,13 +284,15 @@ export class AnnotationSidebarView extends ItemView {
       });
     });
     bulkDelete.addEventListener("click", () => {
-      bulkDelete.disabled = true;
-      void Promise.all(visible.map((annotation) => this.environment.removeAnnotation(annotation)))
-        .catch((error) => {
-          this.environment.showNotice(
-            error instanceof Error ? error.message : String(error)
-          );
-        });
+      new AnnotationSidebarBulkDeleteModal(this.app, {
+        count: visible.length,
+        onConfirm: () => Promise.all(
+          visible.map((annotation) => this.environment.removeAnnotation(annotation))
+        ).then(() => undefined),
+        onError: (error) => this.environment.showNotice(
+          error instanceof Error ? error.message : String(error)
+        )
+      }).open();
     });
     if (visible.length === 0) {
       fragment.append(this.empty(
