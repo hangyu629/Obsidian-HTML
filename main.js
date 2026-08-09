@@ -24,7 +24,7 @@ __export(main_exports, {
   default: () => HtmlPreviewPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian10 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 
 // src/annotations/types.ts
 var ANNOTATION_COLORS = [
@@ -236,11 +236,146 @@ function exportAnnotationMarkdown(sourcePath, annotations) {
 `;
 }
 
+// src/annotations/search-modal.ts
+var import_obsidian = require("obsidian");
+
+// src/annotations/search.ts
+var DEFAULT_ANNOTATION_SEARCH_QUERY = {
+  color: "all",
+  folder: "",
+  kind: "all",
+  query: ""
+};
+function filterAnnotations(annotations, query) {
+  const needle = query.query.trim().toLocaleLowerCase();
+  const folder = query.folder.trim().replace(/\/+$/, "");
+  return annotations.filter((annotation) => {
+    const hasComment = annotation.comment.trim().length > 0;
+    const matchesText = !needle || [
+      annotation.comment,
+      annotation.quote,
+      annotation.sourcePath
+    ].some((value) => value.toLocaleLowerCase().includes(needle));
+    const matchesFolder = !folder || annotation.sourcePath === folder || annotation.sourcePath.startsWith(`${folder}/`);
+    const matchesColor = query.color === "all" || annotation.color === query.color;
+    const matchesKind = query.kind === "all" || query.kind === "comments" && hasComment || query.kind === "highlights" && !hasComment;
+    return matchesText && matchesFolder && matchesColor && matchesKind;
+  });
+}
+
+// src/annotations/search-modal.ts
+var AnnotationSearchModal = class extends import_obsidian.Modal {
+  constructor(app, environment) {
+    super(app);
+    this.environment = environment;
+  }
+  environment;
+  query = { ...DEFAULT_ANNOTATION_SEARCH_QUERY };
+  onOpen() {
+    this.titleEl.textContent = "\u641C\u7D22\u5168\u90E8\u6CE8\u91CA";
+    this.render();
+    void this.refresh();
+  }
+  onClose() {
+    this.contentEl.replaceChildren();
+  }
+  render(results = []) {
+    const root = document.createElement("div");
+    root.className = "annotation-search-modal";
+    const controls = document.createElement("div");
+    controls.className = "annotation-search-controls";
+    const input = document.createElement("input");
+    input.type = "search";
+    input.className = "annotation-search-input";
+    input.placeholder = "\u641C\u7D22\u6458\u5F55\u3001\u6279\u6CE8\u6216\u6587\u4EF6";
+    input.setAttribute("aria-label", "Search annotations");
+    input.value = this.query.query;
+    input.addEventListener("input", () => {
+      this.query = { ...this.query, query: input.value };
+      void this.refresh();
+    });
+    const folder = document.createElement("input");
+    folder.type = "text";
+    folder.className = "annotation-search-folder";
+    folder.placeholder = "\u6587\u4EF6\u5939\u8DEF\u5F84\uFF08\u53EF\u9009\uFF09";
+    folder.setAttribute("aria-label", "Annotation folder");
+    folder.value = this.query.folder;
+    folder.addEventListener("change", () => {
+      this.query = { ...this.query, folder: folder.value };
+      void this.refresh();
+    });
+    const color = document.createElement("select");
+    color.setAttribute("aria-label", "Annotation color filter");
+    for (const [value, label] of [["all", "\u5168\u90E8\u989C\u8272"], ...ANNOTATION_COLORS.map((value2) => [value2, value2])]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      color.append(option);
+    }
+    color.value = this.query.color;
+    color.addEventListener("change", () => {
+      this.query = { ...this.query, color: color.value };
+      void this.refresh();
+    });
+    const kind = document.createElement("select");
+    kind.setAttribute("aria-label", "Annotation type filter");
+    for (const [value, label] of [["all", "\u5168\u90E8\u7C7B\u578B"], ["comments", "\u6709\u6279\u6CE8"], ["highlights", "\u4EC5\u9AD8\u4EAE"]]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      kind.append(option);
+    }
+    kind.value = this.query.kind;
+    kind.addEventListener("change", () => {
+      this.query = { ...this.query, kind: kind.value };
+      void this.refresh();
+    });
+    controls.append(input, folder, color, kind);
+    root.append(controls);
+    const list = document.createElement("div");
+    list.className = "annotation-search-results";
+    if (results.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "annotation-search-empty";
+      empty.textContent = "\u6CA1\u6709\u7B26\u5408\u6761\u4EF6\u7684\u6CE8\u91CA";
+      list.append(empty);
+    }
+    for (const annotation of results) {
+      const result = document.createElement("button");
+      result.type = "button";
+      result.className = "annotation-search-result";
+      result.dataset.annotationColor = annotation.color ?? "yellow";
+      const quote = document.createElement("strong");
+      quote.textContent = annotation.quote;
+      const detail = document.createElement("span");
+      detail.textContent = annotation.comment.trim() || "\u4EC5\u9AD8\u4EAE";
+      const path = document.createElement("small");
+      path.textContent = annotation.sourcePath;
+      result.append(quote, detail, path);
+      result.addEventListener("click", () => {
+        void this.environment.open(annotation.sourcePath, annotation.id).then((opened) => {
+          if (opened) this.close();
+        });
+      });
+      list.append(result);
+    }
+    root.append(list);
+    this.contentEl.replaceChildren(root);
+  }
+  async refresh() {
+    try {
+      this.render(await this.environment.search(this.query));
+    } catch {
+      this.render();
+    }
+  }
+};
+
 // src/annotations/sidebar-view.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 
 // src/annotations/sidebar-edit-modal.ts
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
 var COLOR_LABELS = {
   blue: "\u84DD\u8272",
   green: "\u7EFF\u8272",
@@ -248,7 +383,7 @@ var COLOR_LABELS = {
   violet: "\u7D2B\u8272",
   yellow: "\u9EC4\u8272"
 };
-var AnnotationSidebarEditModal = class extends import_obsidian.Modal {
+var AnnotationSidebarEditModal = class extends import_obsidian2.Modal {
   constructor(app, options) {
     super(app);
     this.options = options;
@@ -345,7 +480,7 @@ var AnnotationSidebarEditModal = class extends import_obsidian.Modal {
 
 // src/annotations/sidebar-view.ts
 var ANNOTATION_SIDEBAR_VIEW_TYPE = "html-preview-annotations";
-var AnnotationSidebarView = class extends import_obsidian2.ItemView {
+var AnnotationSidebarView = class extends import_obsidian3.ItemView {
   constructor(leaf, environment) {
     super(leaf);
     this.environment = environment;
@@ -435,6 +570,14 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     count.className = "annotation-sidebar-count";
     count.textContent = String(this.annotations.length);
     header.append(title, count);
+    const search = document.createElement("button");
+    search.type = "button";
+    search.className = "clickable-icon annotation-sidebar-search";
+    search.title = "\u641C\u7D22\u5168\u90E8\u6CE8\u91CA";
+    search.setAttribute("aria-label", "Search all annotations");
+    (0, import_obsidian3.setIcon)(search, "search");
+    search.addEventListener("click", () => this.environment.searchAnnotations());
+    header.append(search);
     fragment.append(header);
     if (!this.sourcePath) {
       fragment.append(this.empty("\u6253\u5F00 HTML \u6216 Markdown \u6587\u4EF6\u4EE5\u67E5\u770B\u6CE8\u91CA"));
@@ -491,7 +634,7 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     exportButton.className = "annotation-sidebar-export";
     exportButton.setAttribute("aria-label", "Export annotations as Markdown");
     exportButton.title = "\u5BFC\u51FA\u5168\u90E8\u6CE8\u91CA\u4E3A Markdown";
-    (0, import_obsidian2.setIcon)(exportButton, "file-down");
+    (0, import_obsidian3.setIcon)(exportButton, "file-down");
     const exportLabel = document.createElement("span");
     exportLabel.textContent = "\u5BFC\u51FA";
     exportButton.append(exportLabel);
@@ -588,7 +731,7 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     edit.dataset.annotationAction = "edit";
     edit.setAttribute("aria-label", "Edit annotation");
     edit.title = "\u7F16\u8F91\u6279\u6CE8";
-    (0, import_obsidian2.setIcon)(edit, "pencil");
+    (0, import_obsidian3.setIcon)(edit, "pencil");
     edit.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -604,7 +747,7 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     repair.dataset.annotationAction = "repair";
     repair.setAttribute("aria-label", "Repair annotation");
     repair.title = "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8";
-    (0, import_obsidian2.setIcon)(repair, "locate-fixed");
+    (0, import_obsidian3.setIcon)(repair, "locate-fixed");
     repair.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -626,7 +769,7 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     remove.dataset.annotationAction = "delete";
     remove.setAttribute("aria-label", "Delete annotation");
     remove.title = "\u5220\u9664\u6279\u6CE8";
-    (0, import_obsidian2.setIcon)(remove, "trash-2");
+    (0, import_obsidian3.setIcon)(remove, "trash-2");
     remove.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -995,7 +1138,7 @@ var CleanupRuleStore = class {
 };
 
 // src/html-preview-view.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/annotations/runtime.ts
 var ANNOTATION_SAVE_MESSAGE_TYPE = "obsidian-html-preview:annotation-save";
@@ -1519,8 +1662,8 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
 }
 
 // src/diagnostics-modal.ts
-var import_obsidian3 = require("obsidian");
-var DiagnosticsModal = class extends import_obsidian3.Modal {
+var import_obsidian4 = require("obsidian");
+var DiagnosticsModal = class extends import_obsidian4.Modal {
   constructor(app, diagnostics) {
     super(app);
     this.diagnostics = diagnostics;
@@ -1551,8 +1694,8 @@ var DiagnosticsModal = class extends import_obsidian3.Modal {
 };
 
 // src/cleanup/rules-modal.ts
-var import_obsidian4 = require("obsidian");
-var CleanupRulesModal = class extends import_obsidian4.Modal {
+var import_obsidian5 = require("obsidian");
+var CleanupRulesModal = class extends import_obsidian5.Modal {
   constructor(app, options) {
     super(app);
     this.options = options;
@@ -1656,7 +1799,7 @@ var CleanupRulesModal = class extends import_obsidian4.Modal {
     button.setAttribute("aria-label", label);
     button.dataset.cleanupAction = action;
     if (ruleId) button.dataset.ruleId = ruleId;
-    (0, import_obsidian4.setIcon)(button, icon);
+    (0, import_obsidian5.setIcon)(button, icon);
     button.addEventListener("click", () => {
       button.disabled = true;
       void callback().then(() => this.close()).catch((error) => {
@@ -2262,7 +2405,7 @@ function parseUnmatchedRuleIds(value) {
 function parseCleanupModeState(value) {
   return isRecord(value) && value.type === CLEANUP_MODE_STATE_MESSAGE_TYPE && typeof value.enabled === "boolean" ? value.enabled : null;
 }
-var HtmlPreviewView = class extends import_obsidian5.FileView {
+var HtmlPreviewView = class extends import_obsidian6.FileView {
   constructor(leaf, environment) {
     super(leaf);
     this.environment = environment;
@@ -2975,7 +3118,7 @@ var PreviewCoordinator = class {
 };
 
 // src/settings.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var DEFAULT_SETTINGS = {
   allowScripts: true,
   autoEnhanced: true,
@@ -3007,7 +3150,7 @@ function normalizeSettings(value) {
     folderMappings: normalizeMappings(stored.folderMappings)
   };
 }
-var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
+var HtmlPreviewSettingTab = class extends import_obsidian7.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -3015,7 +3158,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
   plugin;
   display() {
     this.containerEl.replaceChildren();
-    new import_obsidian6.Setting(this.containerEl).setName("Allow page JavaScript").setDesc(
+    new import_obsidian7.Setting(this.containerEl).setName("Allow page JavaScript").setDesc(
       "Enabled by default. Required for page cleanup. Scripts run in an isolated frame but can still make network requests."
     ).addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.allowScripts).onChange(async (value) => {
@@ -3024,7 +3167,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
         this.plugin.refreshOpenPreviews();
       })
     );
-    new import_obsidian6.Setting(this.containerEl).setName("Open Markdown in Enhanced Preview by default").setDesc("Open Markdown notes in Enhanced Preview automatically when they are opened.").addToggle(
+    new import_obsidian7.Setting(this.containerEl).setName("Open Markdown in Enhanced Preview by default").setDesc("Open Markdown notes in Enhanced Preview automatically when they are opened.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.autoEnhanced).onChange(async (value) => {
         this.plugin.settings.autoEnhanced = value;
         await this.plugin.saveSettings();
@@ -3033,7 +3176,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
     const templates = this.plugin.listMarkdownTemplates();
     this.addDefaultTemplateSetting(templates);
     this.addDefaultThemeSetting(templates);
-    new import_obsidian6.Setting(this.containerEl).setName("Folder template mappings").setDesc("The most specific matching folder wins when a note has no frontmatter override.").addButton(
+    new import_obsidian7.Setting(this.containerEl).setName("Folder template mappings").setDesc("The most specific matching folder wins when a note has no frontmatter override.").addButton(
       (button) => button.setButtonText("Add mapping").onClick(async () => {
         this.plugin.settings.folderMappings = [
           ...this.plugin.settings.folderMappings,
@@ -3054,7 +3197,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
         );
         await this.plugin.saveSettings();
       };
-      const row = new import_obsidian6.Setting(this.containerEl).setName(`Folder mapping ${index + 1}`).addDropdown(
+      const row = new import_obsidian7.Setting(this.containerEl).setName(`Folder mapping ${index + 1}`).addDropdown(
         (dropdown) => {
           dropdown.addOption("", "Vault root");
           for (const folder of this.plugin.listMarkdownFolders()) {
@@ -3076,7 +3219,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
     });
   }
   addDefaultTemplateSetting(templates) {
-    const setting = new import_obsidian6.Setting(this.containerEl).setName("Default Markdown template").setDesc("Used when opening enhanced reading manually without a matching rule.");
+    const setting = new import_obsidian7.Setting(this.containerEl).setName("Default Markdown template").setDesc("Used when opening enhanced reading manually without a matching rule.");
     setting.addDropdown((dropdown) => {
       for (const template of templates) dropdown.addOption(template.id, template.name);
       dropdown.setValue(this.plugin.settings.defaultTemplateId);
@@ -3093,7 +3236,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
   }
   addDefaultThemeSetting(templates) {
     const selected = templates.find((template) => template.id === this.plugin.settings.defaultTemplateId);
-    const setting = new import_obsidian6.Setting(this.containerEl).setName("Default Markdown theme");
+    const setting = new import_obsidian7.Setting(this.containerEl).setName("Default Markdown theme");
     setting.addDropdown((dropdown) => {
       for (const themeId of selected?.themeIds ?? ["light"]) {
         dropdown.addOption(themeId, selected?.themeNames?.[themeId] ?? themeId);
@@ -3149,7 +3292,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian6.PluginSettingTab {
 };
 
 // src/markdown/enhanced-markdown-view.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/annotations/contextual-ui.ts
 var COLOR_LABELS2 = {
@@ -3610,7 +3753,7 @@ function focusAnnotationMark(root, id) {
 }
 
 // src/markdown/render-document.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
 // src/markdown/css-scope.ts
 function assertNoExternalResources(css) {
@@ -4388,7 +4531,7 @@ async function renderEnhancedMarkdown(input) {
   if (propertiesSlot instanceof HTMLElement) {
     renderProperties(propertiesSlot, input.frontmatter ?? {});
   }
-  await import_obsidian7.MarkdownRenderer.render(
+  await import_obsidian8.MarkdownRenderer.render(
     input.app,
     input.source,
     contentSlot,
@@ -4412,7 +4555,7 @@ ${theme}`, template.manifest.id, input.resolveAsset, dependencies);
 // src/markdown/enhanced-markdown-view.ts
 var ENHANCED_MARKDOWN_VIEW_TYPE = "enhanced-markdown";
 var nextViewId2 = 0;
-var EnhancedMarkdownView = class extends import_obsidian8.FileView {
+var EnhancedMarkdownView = class extends import_obsidian9.FileView {
   constructor(leaf, environment) {
     super(leaf);
     this.environment = environment;
@@ -4461,7 +4604,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     }
     const path = typeof state.file === "string" ? state.file : void 0;
     const nextFile = path ? this.app.vault.getAbstractFileByPath(path) : null;
-    if (nextFile instanceof import_obsidian8.TFile || nextFile) {
+    if (nextFile instanceof import_obsidian9.TFile || nextFile) {
       await this.onLoadFile(nextFile);
     }
   }
@@ -4598,7 +4741,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
       if (token !== this.renderToken || this.file?.path !== file.path) return;
       const root = document.createElement("article");
       root.className = "enhanced-markdown-document";
-      const component = new import_obsidian8.Component();
+      const component = new import_obsidian9.Component();
       const result = await renderEnhancedMarkdown({
         app: this.app,
         component,
@@ -4857,8 +5000,8 @@ function resolveMarkdownTemplate(sourcePath, frontmatter, settings, available, m
 }
 
 // src/markdown/template-modal.ts
-var import_obsidian9 = require("obsidian");
-var MarkdownTemplateModal = class extends import_obsidian9.Modal {
+var import_obsidian10 = require("obsidian");
+var MarkdownTemplateModal = class extends import_obsidian10.Modal {
   constructor(app, environment) {
     super(app);
     this.environment = environment;
@@ -4929,7 +5072,7 @@ var MarkdownTemplateModal = class extends import_obsidian9.Modal {
 };
 
 // src/main.ts
-var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
+var HtmlPreviewPlugin = class extends import_obsidian11.Plugin {
   coordinator = new PreviewCoordinator();
   annotationStore;
   annotationService;
@@ -4949,7 +5092,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     this.cleanupStore = new CleanupRuleStore(
       this.app.vault.adapter,
       ({ message, path }) => {
-        new import_obsidian10.Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
+        new import_obsidian11.Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
       }
     );
     this.annotationStore = new HtmlAnnotationStore(this.app.vault.adapter);
@@ -4966,10 +5109,11 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
         annotationService: this.annotationService,
         exportAnnotations: (sourcePath, annotations) => this.exportAnnotations(sourcePath, annotations),
         repairAnnotation: (sourcePath, id) => this.annotationService.beginAnnotationRepair(sourcePath, id),
+        searchAnnotations: () => this.openAnnotationSearch(),
         focusAnnotation: (sourcePath, id) => this.focusAnnotation(sourcePath, id),
         removeAnnotation: (annotation) => this.annotationService.remove(annotation),
         saveAnnotation: (sourcePath, annotation) => this.annotationService.save(sourcePath, annotation),
-        showNotice: (message) => new import_obsidian10.Notice(message)
+        showNotice: (message) => new import_obsidian11.Notice(message)
       })
     );
     this.registerView(
@@ -4988,7 +5132,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
         },
         resolveAsset: (path) => {
           const file = this.app.vault.getAbstractFileByPath(path);
-          return file instanceof import_obsidian10.TFile ? this.app.vault.getResourcePath(file) : null;
+          return file instanceof import_obsidian11.TFile ? this.app.vault.getResourcePath(file) : null;
         },
         resolveTemplate: (path, frontmatter, mode) => resolveMarkdownTemplate(
           path,
@@ -4998,7 +5142,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
           mode
         ),
         showNotice: (message) => {
-          new import_obsidian10.Notice(message);
+          new import_obsidian11.Notice(message);
         }
       })
     );
@@ -5015,7 +5159,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
           window.open(url, "_blank", "noopener,noreferrer");
         },
         showNotice: (message) => {
-          new import_obsidian10.Notice(message);
+          new import_obsidian11.Notice(message);
         }
       })
     );
@@ -5027,8 +5171,13 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
       callback: () => {
         const leaf = this.app.workspace.getMostRecentLeaf();
         const file = leaf?.view?.file;
-        if (file instanceof import_obsidian10.TFile) void this.openEnhancedMarkdown(file.path, "manual");
+        if (file instanceof import_obsidian11.TFile) void this.openEnhancedMarkdown(file.path, "manual");
       }
+    });
+    this.addCommand({
+      id: "search-vault-annotations",
+      name: "Search annotations across the Vault",
+      callback: () => this.openAnnotationSearch()
     });
     this.addCommand({
       id: "open-annotation-sidebar",
@@ -5057,14 +5206,14 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     });
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (file instanceof import_obsidian10.TFile) {
+        if (file instanceof import_obsidian11.TFile) {
           this.coordinator.notify(file.path);
         }
       })
     );
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        if (file instanceof import_obsidian10.TFile) {
+        if (file instanceof import_obsidian11.TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
         }
@@ -5072,7 +5221,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian10.TFile) {
+        if (file instanceof import_obsidian11.TFile) {
           this.knownVaultPaths.delete(file.path);
           this.coordinator.notify(file.path);
         }
@@ -5082,13 +5231,13 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
       this.app.vault.on("rename", (file, oldPath) => {
         this.knownVaultPaths.delete(oldPath);
         this.coordinator.notify(oldPath);
-        if (file instanceof import_obsidian10.TFile) {
+        if (file instanceof import_obsidian11.TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
           if (isHtmlPath(oldPath) || isHtmlPath(file.path)) {
             void this.cleanupStore.migrateFile(oldPath, file.path).catch((error) => {
               const detail = error instanceof Error ? error.message : String(error);
-              new import_obsidian10.Notice(`Could not migrate HTML cleanup rules: ${detail}`);
+              new import_obsidian11.Notice(`Could not migrate HTML cleanup rules: ${detail}`);
             });
           }
         }
@@ -5131,7 +5280,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     )[0];
     const leaf = existing ?? this.app.workspace.getRightLeaf(false);
     if (!leaf) {
-      new import_obsidian10.Notice("\u65E0\u6CD5\u6253\u5F00\u6CE8\u91CA\u4FA7\u680F\u3002");
+      new import_obsidian11.Notice("\u65E0\u6CD5\u6253\u5F00\u6CE8\u91CA\u4FA7\u680F\u3002");
       return;
     }
     if (!existing) {
@@ -5142,8 +5291,8 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
   }
   async updateAnnotationSidebars(activeLeaf) {
     const file = activeLeaf?.view?.file;
-    const extension = file instanceof import_obsidian10.TFile ? file.extension.toLowerCase() : "";
-    let sourcePath = file instanceof import_obsidian10.TFile && (extension === "html" || extension === "htm" || extension === "md") ? file.path : null;
+    const extension = file instanceof import_obsidian11.TFile ? file.extension.toLowerCase() : "";
+    let sourcePath = file instanceof import_obsidian11.TFile && (extension === "html" || extension === "htm" || extension === "md") ? file.path : null;
     if (sourcePath) {
       this.lastAnnotationSourcePath = sourcePath;
     } else if (activeLeaf?.view?.getViewType?.() === ANNOTATION_SIDEBAR_VIEW_TYPE) {
@@ -5180,7 +5329,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     this.enhancedLeaves.add(view);
     view.addAction?.("book-open-check", "Enhanced reading", () => {
       const file = view.file;
-      if (file instanceof import_obsidian10.TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
+      if (file instanceof import_obsidian11.TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
     });
   }
   async maybeAutoOpen(leaf) {
@@ -5188,7 +5337,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
       return;
     }
     const file = leaf.view.file;
-    if (!(file instanceof import_obsidian10.TFile)) return;
+    if (!(file instanceof import_obsidian11.TFile)) return;
     if (this.nativeMarkdownPaths.get(leaf) === file.path) return;
     this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
@@ -5224,7 +5373,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
   }
   async openEnhancedMarkdown(sourcePath, mode, leaf = this.app.workspace.getMostRecentLeaf(), selected) {
     const file = this.app.vault.getAbstractFileByPath(sourcePath);
-    if (!(file instanceof import_obsidian10.TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
+    if (!(file instanceof import_obsidian11.TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
     this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
     const selection = selected ? { source: "default", ...selected } : resolveMarkdownTemplate(
@@ -5235,7 +5384,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
       mode
     );
     if (!selection) {
-      new import_obsidian10.Notice("No valid Markdown template is available for this note.");
+      new import_obsidian11.Notice("No valid Markdown template is available for this note.");
       return;
     }
     const returnMode = leaf.view?.getMode?.() === "source" ? "source" : "preview";
@@ -5265,14 +5414,33 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     const path = annotationExportPath(sourcePath);
     const content = exportAnnotationMarkdown(sourcePath, annotations);
     const existing = this.app.vault.getAbstractFileByPath(path);
-    if (existing instanceof import_obsidian10.TFile) {
+    if (existing instanceof import_obsidian11.TFile) {
       await this.app.vault.modify(existing, content);
     } else if (existing) {
       throw new Error(`\u65E0\u6CD5\u5BFC\u51FA\u6CE8\u91CA\uFF1A\u76EE\u6807\u8DEF\u5F84\u4E0D\u662F\u6587\u4EF6\uFF1A${path}`);
     } else {
       await this.app.vault.create(path, content);
     }
-    new import_obsidian10.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
+    new import_obsidian11.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
+  }
+  openAnnotationSearch() {
+    new AnnotationSearchModal(this.app, {
+      open: async (sourcePath, id) => {
+        const file = this.app.vault.getAbstractFileByPath(sourcePath);
+        if (!(file instanceof import_obsidian11.TFile)) return false;
+        await this.app.workspace.openLinkText(sourcePath, "", false);
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+        return this.focusAnnotation(sourcePath, id);
+      },
+      search: (query) => this.searchAnnotations(query)
+    }).open();
+  }
+  async searchAnnotations(query) {
+    const paths = this.app.vault.getFiles().filter((file) => ["html", "htm", "md"].includes(file.extension.toLowerCase())).map((file) => file.path);
+    const annotations = (await Promise.all(paths.map((path) => this.annotationService.load(path)))).flat();
+    return filterAnnotations(annotations, query).sort(
+      (left, right) => left.sourcePath.localeCompare(right.sourcePath) || left.target.start - right.target.start
+    );
   }
 };
 function isHtmlPath(path) {

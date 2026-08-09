@@ -28,7 +28,7 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Start repair from the sidebar and select a replacement passage in HTML Preview or Enhanced Markdown Reading.
   - Preserve the existing annotation ID, color, and comment while replacing its quote target.
   - Keep the original source files unchanged and persist only the annotation data update.
-- [ ] `pending` Search and filter annotations across the entire Vault
+- [x] `done` Search and filter annotations across the entire Vault
   - Search quote text and comment text.
   - Filter by file, folder, color, and comment status.
   - Open the source file and focus the selected annotation.

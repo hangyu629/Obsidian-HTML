@@ -13,6 +13,7 @@ export interface AnnotationSidebarEnvironment {
   annotationService: Pick<AnnotationService, "load" | "subscribe">;
   exportAnnotations(sourcePath: string, annotations: readonly HtmlAnnotation[]): Promise<void>;
   repairAnnotation(sourcePath: string, id: string): Promise<boolean>;
+  searchAnnotations(): void;
   focusAnnotation(sourcePath: string, id: string): Promise<boolean>;
   removeAnnotation(annotation: HtmlAnnotation): Promise<void>;
   saveAnnotation(sourcePath: string, annotation: HtmlAnnotation): Promise<void>;
@@ -119,6 +120,14 @@ export class AnnotationSidebarView extends ItemView {
     count.className = "annotation-sidebar-count";
     count.textContent = String(this.annotations.length);
     header.append(title, count);
+    const search = document.createElement("button");
+    search.type = "button";
+    search.className = "clickable-icon annotation-sidebar-search";
+    search.title = "搜索全部注释";
+    search.setAttribute("aria-label", "Search all annotations");
+    setIcon(search, "search");
+    search.addEventListener("click", () => this.environment.searchAnnotations());
+    header.append(search);
     fragment.append(header);
 
     if (!this.sourcePath) {

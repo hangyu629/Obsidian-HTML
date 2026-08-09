@@ -64,6 +64,7 @@ function harness(focusResult = true) {
   const showNotice = vi.fn();
   const exportAnnotations = vi.fn(async () => undefined);
   const repairAnnotation = vi.fn(async () => true);
+  const searchAnnotations = vi.fn();
   const app = {};
   const leaf = Object.assign(Object.create(WorkspaceLeaf.prototype), { app });
   const view = new AnnotationSidebarView(leaf, {
@@ -73,6 +74,7 @@ function harness(focusResult = true) {
     saveAnnotation: (path, annotation) => annotationService.save(path, annotation),
     exportAnnotations,
     repairAnnotation,
+    searchAnnotations,
     showNotice
   });
   document.body.append(view.containerEl);
@@ -82,6 +84,7 @@ function harness(focusResult = true) {
     change: () => changeListener?.(),
     exportAnnotations,
     repairAnnotation,
+    searchAnnotations,
     showNotice,
     view
   };
@@ -177,6 +180,14 @@ describe("AnnotationSidebarView", () => {
     await vi.waitFor(() => {
       expect(exportAnnotations).toHaveBeenCalledWith("notes/a.md", expect.any(Array));
     });
+  });
+
+  it("opens the Vault annotation search", () => {
+    const { searchAnnotations, view } = harness();
+    view.contentEl.querySelector<HTMLButtonElement>(
+      '[aria-label="Search all annotations"]'
+    )?.click();
+    expect(searchAnnotations).toHaveBeenCalledOnce();
   });
 
   it("focuses a clicked annotation and marks unresolved anchors", async () => {

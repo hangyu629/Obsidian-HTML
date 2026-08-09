@@ -7,6 +7,11 @@ import {
   exportAnnotationMarkdown
 } from "./annotations/export";
 import type { HtmlAnnotation } from "./annotations/types";
+import { AnnotationSearchModal } from "./annotations/search-modal";
+import {
+  filterAnnotations,
+  type AnnotationSearchQuery
+} from "./annotations/search";
 import {
   AnnotationSidebarView,
   ANNOTATION_SIDEBAR_VIEW_TYPE
@@ -79,6 +84,7 @@ export default class HtmlPreviewPlugin extends Plugin {
             this.exportAnnotations(sourcePath, annotations),
           repairAnnotation: (sourcePath, id) =>
             this.annotationService.beginAnnotationRepair(sourcePath, id),
+          searchAnnotations: () => this.openAnnotationSearch(),
           focusAnnotation: (sourcePath, id) =>
             this.focusAnnotation(sourcePath, id),
           removeAnnotation: (annotation) => this.annotationService.remove(annotation),
@@ -152,6 +158,11 @@ export default class HtmlPreviewPlugin extends Plugin {
         const file = (leaf?.view as any)?.file;
         if (file instanceof TFile) void this.openEnhancedMarkdown(file.path, "manual");
       }
+    });
+    this.addCommand({
+      id: "search-vault-annotations",
+      name: "Search annotations across the Vault",
+      callback: () => this.openAnnotationSearch()
     });
     this.addCommand({
       id: "open-annotation-sidebar",
@@ -435,6 +446,31 @@ export default class HtmlPreviewPlugin extends Plugin {
       await this.app.vault.create(path, content);
     }
     new Notice(`注释已导出到 ${path}`);
+  }
+
+  private openAnnotationSearch(): void {
+    new AnnotationSearchModal(this.app, {
+      open: async (sourcePath, id) => {
+        const file = this.app.vault.getAbstractFileByPath(sourcePath);
+        if (!(file instanceof TFile)) return false;
+        await this.app.workspace.openLinkText(sourcePath, "", false);
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        return this.focusAnnotation(sourcePath, id);
+      },
+      search: (query) => this.searchAnnotations(query)
+    }).open();
+  }
+
+  private async searchAnnotations(query: AnnotationSearchQuery): Promise<HtmlAnnotation[]> {
+    const paths = this.app.vault.getFiles()
+      .filter((file) => ["html", "htm", "md"].includes(file.extension.toLowerCase()))
+      .map((file) => file.path);
+    const annotations = (await Promise.all(paths.map((path) => this.annotationService.load(path))))
+      .flat();
+    return filterAnnotations(annotations, query).sort(
+      (left, right) => left.sourcePath.localeCompare(right.sourcePath) ||
+        left.target.start - right.target.start
+    );
   }
 }
 
