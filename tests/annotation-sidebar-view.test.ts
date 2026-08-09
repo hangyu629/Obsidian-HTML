@@ -39,9 +39,21 @@ function annotations(): HtmlAnnotation[] {
 
 function harness(focusResult = true) {
   let changeListener: (() => void) | null = null;
+  let currentAnnotations = annotations();
   const annotationService = {
     focus: vi.fn(async (_path: string, _id: string) => focusResult),
-    load: vi.fn(async (_path: string) => annotations()),
+    load: vi.fn(async (_path: string) => [...currentAnnotations]),
+    remove: vi.fn(async (annotation: HtmlAnnotation) => {
+      currentAnnotations = currentAnnotations.filter((item) => item.id !== annotation.id);
+      changeListener?.();
+    }),
+    save: vi.fn(async (_path: string, annotation: HtmlAnnotation) => {
+      currentAnnotations = [
+        ...currentAnnotations.filter((item) => item.id !== annotation.id),
+        annotation
+      ];
+      changeListener?.();
+    }),
     subscribe: vi.fn((_path: string, listener: () => void) => {
       changeListener = listener;
       return () => {
@@ -55,6 +67,8 @@ function harness(focusResult = true) {
   const view = new AnnotationSidebarView(leaf, {
     annotationService,
     focusAnnotation: (path, id) => annotationService.focus(path, id),
+    removeAnnotation: (annotation) => annotationService.remove(annotation),
+    saveAnnotation: (path, annotation) => annotationService.save(path, annotation),
     showNotice
   });
   document.body.append(view.containerEl);
@@ -130,6 +144,46 @@ describe("AnnotationSidebarView", () => {
     expect(showNotice).toHaveBeenCalledWith(
       "无法定位这条注释，原文可能已经发生变化。"
     );
+  });
+
+  it("edits and deletes annotations from the sidebar without breaking focus navigation", async () => {
+    const { annotationService, view } = harness();
+    await view.setSource("notes/a.md");
+
+    const editButton = view.contentEl.querySelector<HTMLButtonElement>(
+      '[data-annotation-action="edit"]'
+    )!;
+    editButton.click();
+
+    const textarea = document.body.querySelector<HTMLTextAreaElement>(
+      '[aria-label="Annotation comment"]'
+    )!;
+    const color = document.body.querySelector<HTMLSelectElement>(
+      '[aria-label="Annotation color"]'
+    )!;
+    textarea.value = "Updated from sidebar";
+    color.value = "pink";
+    color.dispatchEvent(new Event("change", { bubbles: true }));
+    document.body.querySelector<HTMLButtonElement>('[aria-label="Save annotation"]')?.click();
+
+    await vi.waitFor(() => {
+      expect(annotationService.save).toHaveBeenCalledWith(
+        "notes/a.md",
+        expect.objectContaining({
+          color: "pink",
+          comment: "Updated from sidebar",
+          id: "11111111111111111111111111111111"
+        })
+      );
+    });
+
+    document.body.querySelector<HTMLButtonElement>('[data-annotation-action="delete"]')?.click();
+    await vi.waitFor(() => {
+      expect(annotationService.remove).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "11111111111111111111111111111111" })
+      );
+    });
+    expect(annotationService.focus).not.toHaveBeenCalled();
   });
 
   it("shows clear empty states for no source and no annotations", async () => {

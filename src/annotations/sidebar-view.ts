@@ -1,6 +1,7 @@
-import { ItemView, type WorkspaceLeaf } from "obsidian";
+import { ItemView, setIcon, type WorkspaceLeaf } from "obsidian";
 
 import type { AnnotationService } from "./annotation-service";
+import { AnnotationSidebarEditModal } from "./sidebar-edit-modal";
 import { annotationDisplayColor, type HtmlAnnotation } from "./types";
 
 export const ANNOTATION_SIDEBAR_VIEW_TYPE = "html-preview-annotations";
@@ -10,6 +11,8 @@ type AnnotationFilter = "all" | "comments" | "highlights";
 export interface AnnotationSidebarEnvironment {
   annotationService: Pick<AnnotationService, "load" | "subscribe">;
   focusAnnotation(sourcePath: string, id: string): Promise<boolean>;
+  removeAnnotation(annotation: HtmlAnnotation): Promise<void>;
+  saveAnnotation(sourcePath: string, annotation: HtmlAnnotation): Promise<void>;
   showNotice(message: string): void;
 }
 
@@ -171,7 +174,10 @@ export class AnnotationSidebarView extends ItemView {
     this.contentEl.replaceChildren(fragment);
   }
 
-  private item(annotation: HtmlAnnotation): HTMLButtonElement {
+  private item(annotation: HtmlAnnotation): HTMLElement {
+    const sourcePath = this.sourcePath;
+    const entry = document.createElement("div");
+    entry.className = "annotation-sidebar-entry";
     const item = document.createElement("button");
     item.type = "button";
     item.className = "annotation-sidebar-item";
@@ -198,7 +204,6 @@ export class AnnotationSidebarView extends ItemView {
       item.append(label);
     }
     item.addEventListener("click", async () => {
-      const sourcePath = this.sourcePath;
       if (!sourcePath) return;
       item.classList.remove("is-unresolved");
       const found = await this.environment.focusAnnotation(sourcePath, annotation.id);
@@ -207,7 +212,46 @@ export class AnnotationSidebarView extends ItemView {
         this.environment.showNotice("无法定位这条注释，原文可能已经发生变化。");
       }
     });
-    return item;
+
+    const actions = document.createElement("div");
+    actions.className = "annotation-sidebar-actions";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "clickable-icon annotation-sidebar-action";
+    edit.dataset.annotationAction = "edit";
+    edit.setAttribute("aria-label", "Edit annotation");
+    edit.title = "编辑批注";
+    setIcon(edit, "pencil");
+    edit.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!sourcePath) return;
+      new AnnotationSidebarEditModal(this.app, {
+        annotation,
+        onSave: (updated) => this.environment.saveAnnotation(sourcePath, updated)
+      }).open();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "clickable-icon annotation-sidebar-action";
+    remove.dataset.annotationAction = "delete";
+    remove.setAttribute("aria-label", "Delete annotation");
+    remove.title = "删除批注";
+    setIcon(remove, "trash-2");
+    remove.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      remove.disabled = true;
+      void this.environment.removeAnnotation(annotation).catch((error) => {
+        remove.disabled = false;
+        this.environment.showNotice(
+          error instanceof Error ? error.message : String(error)
+        );
+      });
+    });
+    actions.append(edit, remove);
+    entry.append(item, actions);
+    return entry;
   }
 
   private empty(message: string): HTMLElement {
