@@ -31,6 +31,12 @@ Status legend:
 
 Items are ordered by user value and implementation dependency. Each item should be moved to `in_progress` before coding and to `done` only after automated verification and a local Vault build.
 
+- [ ] `in_progress` Add a smart reading mode for saved HTML pages
+  - Extract the main article with Mozilla Readability and render it in a consistent, polished reading layout.
+  - Apply the existing saved cleanup rules before article extraction so manual cleanup remains the fallback when automatic extraction includes unwanted regions.
+  - Keep the original HTML preview and all existing cleanup controls available; smart reading is a reversible view mode and never rewrites the source file.
+  - Preserve annotations, links, images, reading position, and a clear fallback when a page cannot be extracted reliably.
+
 - [x] `done` Repair annotations that can no longer be located after source rewrites
   - Start repair from the sidebar and select a replacement passage in HTML Preview or Enhanced Markdown Reading.
   - Preserve the existing annotation ID, color, and comment while replacing its quote target.
@@ -48,7 +54,7 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Add before/after comparison, stronger candidate grouping, and a clear restore-original action.
 - [x] `done` Improve reading experience
   - Persist scroll position, add print/PDF output, synchronized outline scrolling, image lightbox, and code-copy controls.
-- [ ] `in_progress` Reduce runtime drift and improve resilience
+- [ ] `pending` Reduce runtime drift and improve resilience
   - [x] `done` Safely recover from malformed annotation JSON without blocking previews or the sidebar.
   - [x] `done` Keep DOM and iframe annotation resolution logic generated from one source.
   - [ ] `pending` Add annotation data migration and clearer script/resource security controls.
