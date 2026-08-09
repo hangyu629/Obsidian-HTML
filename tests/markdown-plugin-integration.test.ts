@@ -9,6 +9,7 @@ import { MARKDOWN_TEMPLATE_ROOT } from "../src/markdown/templates/catalog";
 function appHarness() {
   const events = new Map<string, (...args: unknown[]) => void>();
   const workspaceLeaves: unknown[] = [];
+  let layoutReadyCallback: (() => void) | null = null;
   const adapter = {
     exists: vi.fn(async () => false),
     list: vi.fn(async () => ({ files: [], folders: [] })),
@@ -38,10 +39,39 @@ function appHarness() {
       on: vi.fn((name: string, callback: (...args: unknown[]) => void) => {
         events.set(name, callback);
         return { name };
+      }),
+      onLayoutReady: vi.fn((callback: () => void) => {
+        layoutReadyCallback = callback;
+      }),
+      getRightLeaf: vi.fn(() => {
+        const leaf = {
+          app,
+          setViewState: vi.fn(async (state: unknown) => {
+            const viewFactory = (pluginForTest as any)?.registeredViews?.get(
+              (state as { type?: string }).type ?? ""
+            );
+            if (viewFactory) {
+              (leaf as any).view = viewFactory(leaf);
+            }
+            workspaceLeaves.push(leaf);
+          })
+        };
+        return leaf;
       })
     }
   };
-  return { app, events, workspaceLeaves };
+  let pluginForTest: HtmlPreviewPlugin | null = null;
+  return {
+    app,
+    events,
+    get layoutReadyCallback() {
+      return layoutReadyCallback;
+    },
+    set plugin(value: HtmlPreviewPlugin) {
+      pluginForTest = value;
+    },
+    workspaceLeaves
+  };
 }
 
 describe("Markdown plugin integration", () => {
@@ -73,6 +103,23 @@ describe("Markdown plugin integration", () => {
       "magazine-research"
     ]);
     expect(MARKDOWN_TEMPLATE_ROOT).toBe(".html-preview/markdown-templates");
+  });
+
+  it("restores the annotation sidebar after the plugin is re-enabled", async () => {
+    const harness = appHarness();
+    const plugin = new HtmlPreviewPlugin(harness.app as never, { id: "test" } as never);
+    harness.plugin = plugin;
+    await plugin.onload();
+
+    expect(harness.layoutReadyCallback).toBeTypeOf("function");
+    harness.layoutReadyCallback?.();
+    await vi.waitFor(() => {
+      expect(harness.app.workspace.getRightLeaf).toHaveBeenCalled();
+      expect(harness.workspaceLeaves).toHaveLength(1);
+    });
+    expect((harness.workspaceLeaves[0] as any).view.getViewType()).toBe(
+      ANNOTATION_SIDEBAR_VIEW_TYPE
+    );
   });
 
   it("uses the global default template when default enhanced preview is enabled", async () => {

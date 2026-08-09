@@ -164,6 +164,9 @@ export default class HtmlPreviewPlugin extends Plugin {
         })
       );
     }
+    this.app.workspace.onLayoutReady?.(() => {
+      void this.restoreAnnotationSidebar();
+    });
 
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
@@ -239,7 +242,15 @@ export default class HtmlPreviewPlugin extends Plugin {
     }
   }
 
-  private async openAnnotationSidebar(): Promise<void> {
+  private async restoreAnnotationSidebar(): Promise<void> {
+    if (this.app.workspace.getLeavesOfType(ANNOTATION_SIDEBAR_VIEW_TYPE).length > 0) {
+      await this.updateAnnotationSidebars(this.app.workspace.activeLeaf);
+      return;
+    }
+    await this.openAnnotationSidebar(false);
+  }
+
+  private async openAnnotationSidebar(reveal = true): Promise<void> {
     const existing = this.app.workspace.getLeavesOfType(
       ANNOTATION_SIDEBAR_VIEW_TYPE
     )[0];
@@ -249,9 +260,9 @@ export default class HtmlPreviewPlugin extends Plugin {
       return;
     }
     if (!existing) {
-      await leaf.setViewState({ type: ANNOTATION_SIDEBAR_VIEW_TYPE, active: true });
+      await leaf.setViewState({ type: ANNOTATION_SIDEBAR_VIEW_TYPE, active: reveal });
     }
-    await this.app.workspace.revealLeaf(leaf);
+    if (reveal) await this.app.workspace.revealLeaf(leaf);
     await this.updateAnnotationSidebars(this.app.workspace.activeLeaf);
   }
 
