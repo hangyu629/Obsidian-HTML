@@ -71,7 +71,12 @@ function createCleanupStore(initialRules: readonly CleanupRule[] = []) {
 function createHarness(
   read: (file: TFile) => Promise<string> = vi.fn(async () => "<h1>Hello</h1>"),
   allowScripts = true,
-  cleanupStore = createCleanupStore()
+  cleanupStore = createCleanupStore(),
+  readerPageStore = {
+    hasBackup: vi.fn(async () => false),
+    restore: vi.fn(async () => undefined),
+    save: vi.fn(async () => undefined)
+  }
 ) {
   const annotationService = {
     focus: vi.fn(async () => false),
@@ -85,7 +90,8 @@ function createHarness(
   const app = {
     vault: {
       cachedRead: read,
-      getResourcePath: vi.fn((file: TFile) => `app://vault/${file.path}?cache=1`)
+      getResourcePath: vi.fn((file: TFile) => `app://vault/${file.path}?cache=1`),
+      modify: vi.fn(async () => undefined)
     },
     workspace: { openLinkText }
   };
@@ -101,6 +107,7 @@ function createHarness(
     getKnownVaultPaths: () => new Set(["pages/guide.html"]),
     getSettings: () => ({ allowScripts }),
     openExternal,
+    readerPageStore,
     showNotice
   });
   document.body.append(view.containerEl);
@@ -113,6 +120,7 @@ function createHarness(
     coordinator,
     openExternal,
     openLinkText,
+    readerPageStore,
     showNotice,
     view
   };
@@ -158,6 +166,109 @@ describe("HtmlPreviewView", () => {
     );
     expect(iframe?.srcdoc).toContain("<h1>Hello</h1>");
     expect(view.contentEl.classList.contains("html-preview-view")).toBe(true);
+  });
+
+  it("switches to smart reading and keeps the plugin bridge when page scripts are disabled", async () => {
+    const cleanupStore = createCleanupStore([validRule]);
+    const read = vi.fn(async () => `<!doctype html>
+      <html><body><main class="layout"><article><h1>Hello</h1><p>
+      This article has enough text to become a durable smart reading experience that
+      stays useful after the original site disappears. The paragraph keeps going so the
+      extractor clears its minimum threshold without depending on extra fixtures.
+      </p><p>
+      A second paragraph keeps the excerpt and article body long enough for readability.
+      </p></article><aside class="sidebar" aria-label="Related content">Related articles</aside></main></body></html>`);
+    const { view } = createHarness(read, false, cleanupStore);
+    await view.onLoadFile(createFile("pages/index.html"));
+
+    await viewActions(view)
+      .find((action) => action.title === "Smart reading")
+      ?.callback(new MouseEvent("click"));
+    await flushAsyncWork();
+
+    const iframe = view.contentEl.querySelector("iframe");
+    expect(iframe?.srcdoc).toContain("html-reader-shell");
+    expect(iframe?.srcdoc).toContain("data-html-preview-bridge");
+    expect(iframe?.srcdoc).not.toContain("Related articles");
+    expect(iframe?.getAttribute("sandbox")).toBe(
+      "allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+    );
+  });
+
+  it("opens a confirmation modal before saving a reading page", async () => {
+    const read = vi.fn(async () => `<!doctype html>
+      <html><body><article><h1>Hello</h1><p>
+      This article has enough text to become a durable smart reading experience that
+      stays useful after the original site disappears. The paragraph keeps going so the
+      extractor clears its minimum threshold without depending on extra fixtures.
+      </p><p>
+      A second paragraph keeps the excerpt and article body long enough for readability.
+      </p></article></body></html>`);
+    const readerPageStore = {
+      hasBackup: vi.fn(async () => false),
+      restore: vi.fn(async () => undefined),
+      save: vi.fn(async () => undefined)
+    };
+    const { app, view } = createHarness(read, true, createCleanupStore(), readerPageStore);
+    await view.onLoadFile(createFile("pages/index.html"));
+    await viewActions(view)
+      .find((action) => action.title === "Smart reading")
+      ?.callback(new MouseEvent("click"));
+    await flushAsyncWork();
+
+    await viewActions(view)
+      .find((action) => action.title === "Save reading page")
+      ?.callback(new MouseEvent("click"));
+    await flushAsyncWork();
+
+    expect(readerPageStore.save).not.toHaveBeenCalled();
+    document.body
+      .querySelector<HTMLButtonElement>("[data-reader-confirm]")
+      ?.click();
+    await flushAsyncWork();
+
+    expect(readerPageStore.save).toHaveBeenCalledWith(
+      "pages/index.html",
+      expect.stringContaining("<article><h1>Hello</h1>"),
+      expect.stringContaining("html-reader-shell"),
+      expect.any(Function)
+    );
+    expect(app.vault.modify).not.toHaveBeenCalled();
+  });
+
+  it("shows restore only when a backup exists and restores after confirmation", async () => {
+    const read = vi.fn(async () => `<html><body><article><h1>Hello</h1><p>
+      This article has enough text to become a durable smart reading experience that
+      stays useful after the original site disappears. The paragraph keeps going so the
+      extractor clears its minimum threshold without depending on extra fixtures.
+      </p><p>
+      A second paragraph keeps the excerpt and article body long enough for readability.
+      </p></article></body></html>`);
+    const readerPageStore = {
+      hasBackup: vi.fn(async () => true),
+      restore: vi.fn(async () => undefined),
+      save: vi.fn(async () => undefined)
+    };
+    const { view } = createHarness(read, true, createCleanupStore(), readerPageStore);
+    await view.onLoadFile(createFile("pages/index.html"));
+    await flushAsyncWork();
+
+    const restoreAction = viewActions(view).find(
+      (action) => action.title === "Restore original page"
+    );
+    expect(restoreAction?.element?.hidden).toBe(false);
+
+    await restoreAction?.callback(new MouseEvent("click"));
+    await flushAsyncWork();
+    document.body
+      .querySelector<HTMLButtonElement>("[data-reader-confirm]")
+      ?.click();
+    await flushAsyncWork();
+
+    expect(readerPageStore.restore).toHaveBeenCalledWith(
+      "pages/index.html",
+      expect.any(Function)
+    );
   });
 
   it("restores the iframe scroll position after a rerender", async () => {

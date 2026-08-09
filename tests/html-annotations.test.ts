@@ -86,6 +86,11 @@ function createHarness(initial: readonly HtmlAnnotation[] = []) {
     getKnownVaultPaths: () => new Set(),
     getSettings: () => ({ allowScripts: true }),
     openExternal: vi.fn(),
+    readerPageStore: {
+      hasBackup: vi.fn(async () => false),
+      restore: vi.fn(async () => undefined),
+      save: vi.fn(async () => undefined)
+    },
     showNotice
   });
   document.body.append(view.containerEl);
@@ -204,6 +209,11 @@ describe("HtmlPreviewView annotations", () => {
       getKnownVaultPaths: () => new Set(),
       getSettings: () => ({ allowScripts: true }),
       openExternal: vi.fn(),
+      readerPageStore: {
+        hasBackup: vi.fn(async () => false),
+        restore: vi.fn(async () => undefined),
+        save: vi.fn(async () => undefined)
+      },
       showNotice: vi.fn()
     });
     document.body.append(view.containerEl);

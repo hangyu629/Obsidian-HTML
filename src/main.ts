@@ -40,12 +40,14 @@ import {
 import type { MarkdownTemplateSummary } from "./markdown/templates/types";
 import { resolveMarkdownTemplate } from "./markdown/rules";
 import { MarkdownTemplateModal } from "./markdown/template-modal";
+import { ReaderPageStore } from "./reader/page-store";
 
 export default class HtmlPreviewPlugin extends Plugin {
   readonly coordinator = new PreviewCoordinator();
   annotationStore!: HtmlAnnotationStore;
   annotationService!: AnnotationService;
   cleanupStore!: CleanupRuleStore;
+  readerPageStore!: ReaderPageStore;
   settings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
   markdownTemplateCatalog!: MarkdownTemplateCatalog;
   markdownTemplateSettings: HtmlPreviewSettings = { ...DEFAULT_SETTINGS };
@@ -65,6 +67,7 @@ export default class HtmlPreviewPlugin extends Plugin {
         new Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
       }
     );
+    this.readerPageStore = new ReaderPageStore(this.app.vault.adapter as never);
     this.annotationStore = new HtmlAnnotationStore(this.app.vault.adapter as never);
     this.annotationService = new AnnotationService(this.annotationStore);
 
@@ -145,6 +148,7 @@ export default class HtmlPreviewPlugin extends Plugin {
           openExternal: (url) => {
             window.open(url, "_blank", "noopener,noreferrer");
           },
+          readerPageStore: this.readerPageStore,
           showNotice: (message) => {
             new Notice(message);
           }

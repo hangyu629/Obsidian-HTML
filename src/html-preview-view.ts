@@ -36,6 +36,10 @@ import { buildPreviewDocument } from "./preview/document-builder";
 import { classifyNavigation } from "./preview/navigation";
 import type { PreviewCoordinator } from "./preview/preview-coordinator";
 import type { PreviewNavigationMessage } from "./preview/types";
+import { buildReaderPreview, isSavedReaderPage } from "./reader/document-builder";
+import { extractReadableArticle } from "./reader/extractor";
+import { ReaderPageConfirmationModal } from "./reader/page-confirmation-modal";
+import type { ReaderPageStore } from "./reader/page-store";
 import type { HtmlPreviewSettings } from "./settings";
 
 export const HTML_PREVIEW_VIEW_TYPE = "html-preview";
@@ -64,8 +68,11 @@ export interface HtmlPreviewEnvironment {
   getKnownVaultPaths(): ReadonlySet<string>;
   getSettings(): Pick<HtmlPreviewSettings, "allowScripts">;
   openExternal(url: string): void;
+  readerPageStore: Pick<ReaderPageStore, "hasBackup" | "restore" | "save">;
   showNotice(message: string): void;
 }
+
+type PresentationMode = "page" | "reader";
 
 interface AnnotationSaveMessage {
   annotation: {
@@ -143,11 +150,22 @@ export class HtmlPreviewView extends FileView {
   private activeRules: CleanupRule[] = [];
   private suppressAnnotationRenders = 0;
   private cleanupAction: HTMLElement | null = null;
+  private cleanupManagerAction: HTMLElement | null = null;
   private originalAction: HTMLElement | null = null;
+  private reloadAction: HTMLElement | null = null;
+  private restoreReaderAction: HTMLElement | null = null;
+  private saveReaderAction: HTMLElement | null = null;
+  private smartReadingAction: HTMLElement | null = null;
+  private undoAction: HTMLElement | null = null;
   private showOriginal = false;
   private cleanupMode = false;
   private diagnostics: DisplayDiagnostic[] = [];
   private frame: HTMLIFrameElement | null = null;
+  private backupAvailable = false;
+  private lastSource = "";
+  private presentationMode: PresentationMode = "page";
+  private readonly scrollByMode = new Map<PresentationMode, { x: number; y: number }>();
+  private standaloneReaderSource: string | null = null;
   private readonly viewId = `html-preview-${++nextViewId}`;
   private focusSequence = 0;
   private readonly pendingFocus = new Map<
@@ -177,7 +195,7 @@ export class HtmlPreviewView extends FileView {
   onload(): void {
     super.onload();
     this.contentEl.classList.add("html-preview-view");
-    this.addAction("rotate-cw", "Reload preview", () => {
+    this.reloadAction = this.addAction("rotate-cw", "Reload preview", () => {
       void this.reload();
     });
     this.cleanupAction = this.addAction("eraser", "Clean up page", () => {
@@ -190,11 +208,20 @@ export class HtmlPreviewView extends FileView {
     });
     this.updateOriginalAction();
     this.updateCleanupAction();
-    this.addAction("undo-2", "Undo cleanup", () => {
+    this.undoAction = this.addAction("undo-2", "Undo cleanup", () => {
       void this.undoCleanup();
     });
-    this.addAction("list-x", "Manage cleanup rules", () => {
+    this.cleanupManagerAction = this.addAction("list-x", "Manage cleanup rules", () => {
       this.openCleanupManager();
+    });
+    this.smartReadingAction = this.addAction("book-open", "Smart reading", () => {
+      void this.toggleSmartReading();
+    });
+    this.saveReaderAction = this.addAction("save", "Save reading page", () => {
+      this.openSaveReaderPage();
+    });
+    this.restoreReaderAction = this.addAction("history", "Restore original page", () => {
+      this.openRestoreOriginalPage();
     });
     this.addAction("external-link", "Open outside Obsidian", () => {
       this.openCurrentExternally();
@@ -205,6 +232,7 @@ export class HtmlPreviewView extends FileView {
     this.registerDomEvent(window, "message", (event) => {
       void this.handleMessage(event as MessageEvent<unknown>);
     });
+    this.updateActionVisibility();
   }
 
   async onLoadFile(file: TFile): Promise<void> {
@@ -212,8 +240,12 @@ export class HtmlPreviewView extends FileView {
     if (this.file?.path !== file.path) {
       this.undoStack = [];
       this.setCleanupMode(false, false);
+      this.presentationMode = "page";
+      this.scrollByMode.clear();
       this.showOriginal = false;
+      this.standaloneReaderSource = null;
       this.updateOriginalAction();
+      this.updateActionVisibility();
     }
     this.file = file;
     this.subscribe(file.path);
@@ -232,7 +264,12 @@ export class HtmlPreviewView extends FileView {
     this.activeRenderId = "";
     this.activeAnnotations = [];
     this.activeRules = [];
+    this.backupAvailable = false;
+    this.lastSource = "";
     this.showOriginal = false;
+    this.presentationMode = "page";
+    this.scrollByMode.clear();
+    this.standaloneReaderSource = null;
     this.suppressAnnotationRenders = 0;
     this.unmatchedRuleIds.clear();
     this.undoStack = [];
@@ -250,6 +287,9 @@ export class HtmlPreviewView extends FileView {
     this.file = file;
     this.undoStack = [];
     this.setCleanupMode(false, false);
+    this.presentationMode = "page";
+    this.scrollByMode.clear();
+    this.standaloneReaderSource = null;
     this.subscribe(file.path);
     await this.render();
   }
@@ -266,6 +306,11 @@ export class HtmlPreviewView extends FileView {
     this.activeRenderId = "";
     this.activeAnnotations = [];
     this.activeRules = [];
+    this.backupAvailable = false;
+    this.lastSource = "";
+    this.presentationMode = "page";
+    this.scrollByMode.clear();
+    this.standaloneReaderSource = null;
     this.unmatchedRuleIds.clear();
     this.undoStack = [];
     this.setCleanupMode(false, false);
@@ -276,6 +321,102 @@ export class HtmlPreviewView extends FileView {
 
   async reload(): Promise<void> {
     await this.render();
+  }
+
+  private canUseBridge(): boolean {
+    return this.presentationMode === "reader" || this.environment.getSettings().allowScripts;
+  }
+
+  private currentTheme(): "dark" | "light" {
+    return document.body.classList.contains("theme-dark") ? "dark" : "light";
+  }
+
+  private rememberScroll(mode: PresentationMode): void {
+    if (!this.frame?.contentWindow) {
+      return;
+    }
+    this.scrollByMode.set(mode, {
+      x: this.frame.contentWindow.scrollX,
+      y: this.frame.contentWindow.scrollY
+    });
+  }
+
+  private async toggleSmartReading(): Promise<void> {
+    this.rememberScroll(this.presentationMode);
+    this.presentationMode = this.presentationMode === "reader" ? "page" : "reader";
+    this.updateActionVisibility();
+    await this.render();
+  }
+
+  private updateActionVisibility(): void {
+    const readerMode = this.presentationMode === "reader";
+    const pageOnly = !readerMode;
+    this.cleanupAction?.toggleAttribute("hidden", !pageOnly);
+    this.originalAction?.toggleAttribute("hidden", !pageOnly);
+    this.undoAction?.toggleAttribute("hidden", !pageOnly);
+    this.cleanupManagerAction?.toggleAttribute("hidden", !pageOnly);
+    this.saveReaderAction?.toggleAttribute(
+      "hidden",
+      !readerMode || this.standaloneReaderSource === null
+    );
+    this.restoreReaderAction?.toggleAttribute("hidden", !this.backupAvailable);
+    this.smartReadingAction?.classList.toggle("is-active", readerMode);
+    this.smartReadingAction?.setAttribute("aria-pressed", String(readerMode));
+  }
+
+  private openSaveReaderPage(): void {
+    const file = this.file;
+    const readerSource = this.standaloneReaderSource;
+    if (!file || readerSource === null || this.lastSource.length === 0) {
+      return;
+    }
+    new ReaderPageConfirmationModal(this.app, {
+      mode: "save",
+      onConfirm: async () => {
+        await this.environment.readerPageStore.save(
+          file.path,
+          this.lastSource,
+          readerSource,
+          (source) => this.app.vault.modify(file, source)
+        );
+        this.backupAvailable = true;
+        this.presentationMode = "page";
+        this.standaloneReaderSource = null;
+        this.updateActionVisibility();
+        await this.render();
+      },
+      onError: (error) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        this.environment.showNotice(`Could not save the reading page: ${detail}`);
+      },
+      sourcePath: file.path
+    }).open();
+  }
+
+  private openRestoreOriginalPage(): void {
+    const file = this.file;
+    if (!file || !this.backupAvailable) {
+      return;
+    }
+    new ReaderPageConfirmationModal(this.app, {
+      mode: "restore",
+      onConfirm: async () => {
+        await this.environment.readerPageStore.restore(
+          file.path,
+          (source) => this.app.vault.modify(file, source)
+        );
+        this.backupAvailable = false;
+        this.presentationMode = "page";
+        this.standaloneReaderSource = null;
+        this.updateActionVisibility();
+        await this.render();
+      },
+      onError: (error) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        this.environment.showNotice(`Could not restore the original page: ${detail}`);
+      },
+      sourcePath: file.path
+    }).open();
   }
 
   private subscribe(sourcePath: string): void {
@@ -316,46 +457,87 @@ export class HtmlPreviewView extends FileView {
       return;
     }
 
-    const previousScroll = this.frame?.contentWindow
-      ? {
-          x: this.frame.contentWindow.scrollX,
-          y: this.frame.contentWindow.scrollY
-        }
-      : null;
+    this.rememberScroll(this.presentationMode);
+    const previousScroll = this.scrollByMode.get(this.presentationMode) ?? null;
     const token = ++this.renderToken;
     const renderId = this.environment.createRenderId?.() ?? createRenderId();
     const allowScripts = this.environment.getSettings().allowScripts;
+    const readerMode = this.presentationMode === "reader";
 
     try {
-      const [source, cleanupRules, annotations] = await Promise.all([
+      const [source, cleanupRules, annotations, backupAvailable] = await Promise.all([
         this.app.vault.cachedRead(file),
-        this.loadCleanupRules(file.path, allowScripts),
-        this.environment.annotationService.load(file.path)
+        readerMode || allowScripts
+          ? this.loadStoredCleanupRules(file.path)
+          : Promise.resolve([]),
+        this.environment.annotationService.load(file.path),
+        this.environment.readerPageStore.hasBackup(file.path).catch(() => false)
       ]);
       if (token !== this.renderToken || this.file?.path !== file.path) {
         return;
       }
 
-      const result = buildPreviewDocument({
-        allowScripts,
-        cleanupRules: this.showOriginal ? [] : cleanupRules,
-        annotations,
-        knownVaultPaths: this.environment.getKnownVaultPaths(),
-        renderId,
-        resourceUrl: this.app.vault.getResourcePath(file),
-        source,
-        sourcePath: file.path
-      });
+      this.backupAvailable = backupAvailable;
+      this.lastSource = source;
+      let result;
+      let sandbox = allowScripts ? SANDBOX_FLAGS : SCRIPT_FREE_SANDBOX_FLAGS;
+      if (readerMode) {
+        const extracted = extractReadableArticle({
+          cleanupRules,
+          source,
+          sourcePath: file.path
+        });
+        if (!extracted.ok) {
+          this.presentationMode = "page";
+          this.standaloneReaderSource = null;
+          this.updateActionVisibility();
+          this.environment.showNotice(
+            "No reliable article content was found for smart reading."
+          );
+          result = buildPreviewDocument({
+            allowScripts,
+            cleanupRules: this.showOriginal || isSavedReaderPage(source) ? [] : cleanupRules,
+            annotations,
+            knownVaultPaths: this.environment.getKnownVaultPaths(),
+            renderId,
+            resourceUrl: this.app.vault.getResourcePath(file),
+            source,
+            sourcePath: file.path
+          });
+        } else {
+          const readerPreview = buildReaderPreview({
+            annotations,
+            article: extracted.article,
+            knownVaultPaths: this.environment.getKnownVaultPaths(),
+            renderId,
+            resourceUrl: this.app.vault.getResourcePath(file),
+            sourcePath: file.path,
+            theme: this.currentTheme()
+          });
+          this.standaloneReaderSource = readerPreview.standaloneHtml;
+          result = readerPreview;
+          sandbox = SANDBOX_FLAGS;
+        }
+      } else {
+        this.standaloneReaderSource = null;
+        result = buildPreviewDocument({
+          allowScripts,
+          cleanupRules: this.showOriginal || isSavedReaderPage(source) ? [] : cleanupRules,
+          annotations,
+          knownVaultPaths: this.environment.getKnownVaultPaths(),
+          renderId,
+          resourceUrl: this.app.vault.getResourcePath(file),
+          source,
+          sourcePath: file.path
+        });
+      }
       if (token !== this.renderToken) {
         return;
       }
 
       const frame = document.createElement("iframe");
       frame.className = "html-preview-frame";
-      frame.setAttribute(
-        "sandbox",
-        allowScripts ? SANDBOX_FLAGS : SCRIPT_FREE_SANDBOX_FLAGS
-      );
+      frame.setAttribute("sandbox", sandbox);
       frame.setAttribute("title", `Preview of ${file.name}`);
       frame.srcdoc = result.html;
       this.frame = frame;
@@ -364,12 +546,13 @@ export class HtmlPreviewView extends FileView {
       this.activeRules = cleanupRules;
       this.unmatchedRuleIds.clear();
       this.diagnostics = result.diagnostics;
+      this.updateActionVisibility();
       frame.addEventListener("load", () => {
         if (this.frame === frame && previousScroll &&
           (previousScroll.x !== 0 || previousScroll.y !== 0)) {
           frame.contentWindow?.scrollTo(previousScroll.x, previousScroll.y);
         }
-        if (this.frame === frame && this.cleanupMode) {
+        if (this.frame === frame && this.cleanupMode && this.presentationMode === "page") {
           this.postCleanupMode();
         }
       });
@@ -391,6 +574,8 @@ export class HtmlPreviewView extends FileView {
       this.activeRenderId = "";
       this.activeAnnotations = [];
       this.activeRules = [];
+      this.standaloneReaderSource = null;
+      this.updateActionVisibility();
       this.showState("Unable to preview this HTML file");
     }
   }
@@ -621,7 +806,7 @@ export class HtmlPreviewView extends FileView {
   }
 
   async focusAnnotation(id: string): Promise<boolean> {
-    if (!this.environment.getSettings().allowScripts ||
+    if (!this.canUseBridge() ||
       !this.frame?.contentWindow || !this.activeRenderId) return false;
     const requestId = `focus-${++this.focusSequence}`;
     return new Promise<boolean>((resolve) => {
@@ -643,7 +828,7 @@ export class HtmlPreviewView extends FileView {
   }
 
   beginAnnotationRepair(id: string): boolean {
-    if (!this.environment.getSettings().allowScripts ||
+    if (!this.canUseBridge() ||
       !this.frame?.contentWindow || !this.activeRenderId ||
       !this.activeAnnotations.some((annotation) => annotation.id === id)) {
       return false;
@@ -656,7 +841,7 @@ export class HtmlPreviewView extends FileView {
       },
       "*"
     );
-    this.environment.showNotice("请选择新的文本来重新定位这条批注。");
+    this.environment.showNotice("Select new text to repair this annotation.");
     return true;
   }
 
@@ -668,13 +853,7 @@ export class HtmlPreviewView extends FileView {
     this.pendingFocus.clear();
   }
 
-  private async loadCleanupRules(
-    sourcePath: string,
-    allowScripts: boolean
-  ): Promise<CleanupRule[]> {
-    if (!allowScripts) {
-      return [];
-    }
+  private async loadStoredCleanupRules(sourcePath: string): Promise<CleanupRule[]> {
     try {
       return await this.environment.cleanupStore.loadEffective(sourcePath);
     } catch (error) {
