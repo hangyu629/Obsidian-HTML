@@ -15,6 +15,7 @@ function appHarness() {
     list: vi.fn(async () => ({ files: [], folders: [] })),
     read: vi.fn(async () => "")
   };
+  const vaultFiles = new Map<string, TFile>();
   const app = {
     metadataCache: { getFileCache: vi.fn(() => ({ frontmatter: {} })) },
     vault: {
@@ -25,7 +26,13 @@ function appHarness() {
         return { name };
       }),
       cachedRead: vi.fn(async () => "# Note"),
-      getAbstractFileByPath: vi.fn((path: string) =>
+      create: vi.fn(async (path: string) => {
+        const file = Object.assign(Object.create(TFile.prototype), { path }) as TFile;
+        vaultFiles.set(path, file);
+        return file;
+      }),
+      modify: vi.fn(async (_file: TFile, _content: string) => undefined),
+      getAbstractFileByPath: vi.fn((path: string) => vaultFiles.get(path) ??
         Object.assign(Object.create(TFile.prototype), {
           basename: "Note", extension: "md", name: "Note.md", path
         })
@@ -75,6 +82,36 @@ function appHarness() {
 }
 
 describe("Markdown plugin integration", () => {
+  it("exports annotations to a sibling Markdown file and updates an existing export", async () => {
+    const { app } = appHarness();
+    const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
+    const exportAnnotations = (plugin as any).exportAnnotations.bind(plugin);
+    const annotations = [{
+      id: "a1",
+      color: "blue",
+      comment: "A note",
+      quote: "Quoted text",
+      sourcePath: "notes/Note.md",
+      target: { start: 2, end: 13, exact: "Quoted text", prefix: "", suffix: "" }
+    }];
+
+    (app.vault.getAbstractFileByPath as ReturnType<typeof vi.fn>).mockReturnValueOnce(undefined);
+    await exportAnnotations("notes/Note.md", annotations);
+    expect(app.vault.create).toHaveBeenCalledWith(
+      "notes/Note.annotations.md",
+      expect.stringContaining("A note")
+    );
+
+    (app.vault.getAbstractFileByPath as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+      Object.assign(Object.create(TFile.prototype), { path: "notes/Note.annotations.md" })
+    );
+    await exportAnnotations("notes/Note.md", annotations);
+    expect(app.vault.modify).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "notes/Note.annotations.md" }),
+      expect.stringContaining("Quoted text")
+    );
+  });
+
   it("registers enhanced Markdown without claiming the md extension", async () => {
     const { app } = appHarness();
     const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);

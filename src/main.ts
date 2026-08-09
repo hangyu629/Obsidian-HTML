@@ -3,6 +3,11 @@ import { Notice, Plugin, TFile } from "obsidian";
 import { HtmlAnnotationStore } from "./annotations/annotation-store";
 import { AnnotationService } from "./annotations/annotation-service";
 import {
+  annotationExportPath,
+  exportAnnotationMarkdown
+} from "./annotations/export";
+import type { HtmlAnnotation } from "./annotations/types";
+import {
   AnnotationSidebarView,
   ANNOTATION_SIDEBAR_VIEW_TYPE
 } from "./annotations/sidebar-view";
@@ -70,6 +75,8 @@ export default class HtmlPreviewPlugin extends Plugin {
       (leaf) =>
         new AnnotationSidebarView(leaf, {
           annotationService: this.annotationService,
+          exportAnnotations: (sourcePath, annotations) =>
+            this.exportAnnotations(sourcePath, annotations),
           focusAnnotation: (sourcePath, id) =>
             this.focusAnnotation(sourcePath, id),
           removeAnnotation: (annotation) => this.annotationService.remove(annotation),
@@ -409,6 +416,23 @@ export default class HtmlPreviewPlugin extends Plugin {
         void this.openEnhancedMarkdown(sourcePath, "manual", undefined, selection);
       }
     }).open();
+  }
+
+  private async exportAnnotations(
+    sourcePath: string,
+    annotations: readonly HtmlAnnotation[]
+  ): Promise<void> {
+    const path = annotationExportPath(sourcePath);
+    const content = exportAnnotationMarkdown(sourcePath, annotations);
+    const existing = this.app.vault.getAbstractFileByPath(path);
+    if (existing instanceof TFile) {
+      await this.app.vault.modify(existing, content);
+    } else if (existing) {
+      throw new Error(`无法导出注释：目标路径不是文件：${path}`);
+    } else {
+      await this.app.vault.create(path, content);
+    }
+    new Notice(`注释已导出到 ${path}`);
   }
 }
 

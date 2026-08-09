@@ -382,6 +382,24 @@
   background: var(--background-primary);
 }
 
+.annotation-sidebar-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-normal);
+  background: var(--background-primary);
+}
+
+.annotation-sidebar-export:hover,
+.annotation-sidebar-bulk-delete:hover {
+  border-color: var(--background-modifier-border-hover);
+  background: var(--background-modifier-hover);
+}
+
 .annotation-sidebar-filter {
   min-height: 28px;
   padding: 4px 9px;

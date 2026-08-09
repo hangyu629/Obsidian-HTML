@@ -62,6 +62,7 @@ function harness(focusResult = true) {
     })
   };
   const showNotice = vi.fn();
+  const exportAnnotations = vi.fn(async () => undefined);
   const app = {};
   const leaf = Object.assign(Object.create(WorkspaceLeaf.prototype), { app });
   const view = new AnnotationSidebarView(leaf, {
@@ -69,11 +70,12 @@ function harness(focusResult = true) {
     focusAnnotation: (path, id) => annotationService.focus(path, id),
     removeAnnotation: (annotation) => annotationService.remove(annotation),
     saveAnnotation: (path, annotation) => annotationService.save(path, annotation),
+    exportAnnotations,
     showNotice
   });
   document.body.append(view.containerEl);
   view.onload();
-  return { annotationService, change: () => changeListener?.(), showNotice, view };
+  return { annotationService, change: () => changeListener?.(), exportAnnotations, showNotice, view };
 }
 
 function clickByText(host: HTMLElement, text: string): void {
@@ -151,6 +153,21 @@ describe("AnnotationSidebarView", () => {
     });
     expect(view.contentEl.querySelectorAll(".annotation-sidebar-item")).toHaveLength(0);
     expect(view.contentEl.textContent).toContain("没有符合当前筛选条件的注释");
+  });
+
+  it("exports all annotations for the active source", async () => {
+    const { exportAnnotations, view } = harness();
+    await view.setSource("notes/a.md");
+
+    const button = view.contentEl.querySelector<HTMLButtonElement>(
+      '[aria-label="Export annotations as Markdown"]'
+    );
+    expect(button).toBeDefined();
+    button?.click();
+
+    await vi.waitFor(() => {
+      expect(exportAnnotations).toHaveBeenCalledWith("notes/a.md", expect.any(Array));
+    });
   });
 
   it("focuses a clicked annotation and marks unresolved anchors", async () => {

@@ -17,7 +17,7 @@ Status legend:
 - [x] `done` Preserve sidebar annotation source when switching to another right-side tab
 - [x] `done` Polish the sidebar annotation edit modal
 - [x] `done` Add clearer bulk and management actions for the sidebar
-- [ ] `pending` Add annotation export to Markdown
+- [x] `done` Add annotation export to Markdown
 - [ ] `pending` Harden re-anchor heuristics for repeated quotes and larger text rewrites
 
 ## Notes

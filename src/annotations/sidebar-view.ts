@@ -11,6 +11,7 @@ type AnnotationSort = "document" | "newest";
 
 export interface AnnotationSidebarEnvironment {
   annotationService: Pick<AnnotationService, "load" | "subscribe">;
+  exportAnnotations(sourcePath: string, annotations: readonly HtmlAnnotation[]): Promise<void>;
   focusAnnotation(sourcePath: string, id: string): Promise<boolean>;
   removeAnnotation(annotation: HtmlAnnotation): Promise<void>;
   saveAnnotation(sourcePath: string, annotation: HtmlAnnotation): Promise<void>;
@@ -171,7 +172,30 @@ export class AnnotationSidebarView extends ItemView {
     bulkDelete.className = "annotation-sidebar-bulk-delete";
     bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
     bulkDelete.textContent = "删除当前筛选";
-    management.append(sort, bulkDelete);
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "annotation-sidebar-export";
+    exportButton.setAttribute("aria-label", "Export annotations as Markdown");
+    exportButton.title = "导出全部注释为 Markdown";
+    setIcon(exportButton, "file-down");
+    const exportLabel = document.createElement("span");
+    exportLabel.textContent = "导出";
+    exportButton.append(exportLabel);
+    exportButton.addEventListener("click", () => {
+      const sourcePath = this.sourcePath;
+      if (!sourcePath) return;
+      exportButton.disabled = true;
+      void this.environment.exportAnnotations(sourcePath, this.annotations)
+        .catch((error) => {
+          this.environment.showNotice(
+            error instanceof Error ? error.message : String(error)
+          );
+        })
+        .finally(() => {
+          exportButton.disabled = false;
+        });
+    });
+    management.append(sort, exportButton, bulkDelete);
     fragment.append(management);
 
     if (error) {

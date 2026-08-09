@@ -195,6 +195,40 @@ var AnnotationService = class {
   }
 };
 
+// src/annotations/export.ts
+function annotationExportPath(sourcePath) {
+  return `${sourcePath.replace(/\.(?:html?|md)$/i, "")}.annotations.md`;
+}
+function quoteBlock(value) {
+  return value.split("\n").map((line) => `> ${line}`).join("\n");
+}
+function exportAnnotationMarkdown(sourcePath, annotations) {
+  const lines = [
+    "# Annotations",
+    "",
+    `Source: \`${sourcePath}\``,
+    "",
+    annotations.length === 0 ? "No annotations were added to this file." : annotations.map((annotation, index) => {
+      const comment = annotation.comment.trim() || "No comment.";
+      return [
+        `## Annotation ${index + 1}`,
+        "",
+        quoteBlock(annotation.quote),
+        "",
+        `- Color: ${annotation.color ?? "yellow"}`,
+        `- Location: ${annotation.target.start}-${annotation.target.end}`,
+        `- ID: \`${annotation.id}\``,
+        "",
+        "**Comment**",
+        "",
+        comment
+      ].join("\n");
+    }).join("\n\n")
+  ];
+  return `${lines.join("\n")}
+`;
+}
+
 // src/annotations/sidebar-view.ts
 var import_obsidian2 = require("obsidian");
 
@@ -445,7 +479,28 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
     bulkDelete.className = "annotation-sidebar-bulk-delete";
     bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
     bulkDelete.textContent = "\u5220\u9664\u5F53\u524D\u7B5B\u9009";
-    management.append(sort, bulkDelete);
+    const exportButton = document.createElement("button");
+    exportButton.type = "button";
+    exportButton.className = "annotation-sidebar-export";
+    exportButton.setAttribute("aria-label", "Export annotations as Markdown");
+    exportButton.title = "\u5BFC\u51FA\u5168\u90E8\u6CE8\u91CA\u4E3A Markdown";
+    (0, import_obsidian2.setIcon)(exportButton, "file-down");
+    const exportLabel = document.createElement("span");
+    exportLabel.textContent = "\u5BFC\u51FA";
+    exportButton.append(exportLabel);
+    exportButton.addEventListener("click", () => {
+      const sourcePath = this.sourcePath;
+      if (!sourcePath) return;
+      exportButton.disabled = true;
+      void this.environment.exportAnnotations(sourcePath, this.annotations).catch((error2) => {
+        this.environment.showNotice(
+          error2 instanceof Error ? error2.message : String(error2)
+        );
+      }).finally(() => {
+        exportButton.disabled = false;
+      });
+    });
+    management.append(sort, exportButton, bulkDelete);
     fragment.append(management);
     if (error) {
       fragment.append(this.empty(error));
@@ -4780,6 +4835,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
       ANNOTATION_SIDEBAR_VIEW_TYPE,
       (leaf) => new AnnotationSidebarView(leaf, {
         annotationService: this.annotationService,
+        exportAnnotations: (sourcePath, annotations) => this.exportAnnotations(sourcePath, annotations),
         focusAnnotation: (sourcePath, id) => this.focusAnnotation(sourcePath, id),
         removeAnnotation: (annotation) => this.annotationService.remove(annotation),
         saveAnnotation: (sourcePath, annotation) => this.annotationService.save(sourcePath, annotation),
@@ -5074,6 +5130,19 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
         void this.openEnhancedMarkdown(sourcePath, "manual", void 0, selection);
       }
     }).open();
+  }
+  async exportAnnotations(sourcePath, annotations) {
+    const path = annotationExportPath(sourcePath);
+    const content = exportAnnotationMarkdown(sourcePath, annotations);
+    const existing = this.app.vault.getAbstractFileByPath(path);
+    if (existing instanceof import_obsidian10.TFile) {
+      await this.app.vault.modify(existing, content);
+    } else if (existing) {
+      throw new Error(`\u65E0\u6CD5\u5BFC\u51FA\u6CE8\u91CA\uFF1A\u76EE\u6807\u8DEF\u5F84\u4E0D\u662F\u6587\u4EF6\uFF1A${path}`);
+    } else {
+      await this.app.vault.create(path, content);
+    }
+    new import_obsidian10.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
   }
 };
 function isHtmlPath(path) {
