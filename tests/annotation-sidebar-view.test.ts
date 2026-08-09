@@ -412,7 +412,7 @@ describe("AnnotationSidebarView", () => {
     expect(css).not.toMatch(/\.annotation-sidebar\s*\{[^}]*container-type:/);
     expect(css).not.toContain("@container");
     expect(css).toMatch(
-      /\.annotation-sidebar\s*\{[^}]*--annotation-sidebar-gutter:\s*12px;/
+      /\.annotation-sidebar\s*\{[^}]*--annotation-sidebar-gutter:\s*20px;/
     );
     expect(css.match(/padding-inline:\s*var\(--annotation-sidebar-gutter\);/g))
       .toHaveLength(3);

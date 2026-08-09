@@ -24,6 +24,7 @@ Status legend:
 - [x] `done` Replace the oversized card layout with a compact one-row management toolbar and a lightweight aligned annotation list
 - [x] `done` Prevent stale annotation paint after expanding or collapsing management controls
 - [x] `done` Align the management toolbar background and controls to the same horizontal grid as the sidebar header, filters, and annotation list
+- [x] `done` Increase the shared sidebar gutter so management controls and annotation content have more horizontal breathing room
 
 ## Next Roadmap
 
