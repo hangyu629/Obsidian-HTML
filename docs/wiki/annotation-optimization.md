@@ -34,7 +34,8 @@ Items are ordered by user value and implementation dependency. Each item should 
 - [ ] `in_progress` Add a smart reading mode for saved HTML pages
   - Extract the main article with Mozilla Readability and render it in a consistent, polished reading layout.
   - Apply the existing saved cleanup rules before article extraction so manual cleanup remains the fallback when automatic extraction includes unwanted regions.
-  - Keep the original HTML preview and all existing cleanup controls available; smart reading is a reversible view mode and never rewrites the source file.
+  - Keep the original HTML preview and all existing cleanup controls available; smart reading starts as a reversible view mode.
+  - Allow an explicit confirmed save to replace the current HTML with the clean reading page, while keeping a restorable hidden backup of the prior source.
   - Preserve annotations, links, images, reading position, and a clear fallback when a page cannot be extracted reliably.
 
 - [x] `done` Repair annotations that can no longer be located after source rewrites

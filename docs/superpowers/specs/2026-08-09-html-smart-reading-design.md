@@ -5,7 +5,9 @@
 
 ## Goal
 
-Add a reversible smart reading mode for saved HTML pages. The mode extracts the main article, removes surrounding page chrome, and renders the result in a consistent reading layout without modifying the source HTML. Existing manual cleanup remains available and its saved rules are applied before automatic extraction, so users can correct noisy extraction results with the workflow they already know.
+Add a smart reading mode for saved HTML pages. The mode extracts the main article, removes surrounding page chrome, and renders the result in a consistent reading layout. Existing manual cleanup remains available and its saved rules are applied before automatic extraction, so users can correct noisy extraction results with the workflow they already know.
+
+Smart reading starts as a reversible preview. From that preview, the user may explicitly replace the current HTML file with the clean standalone reading page. The plugin creates a hidden restorable backup before replacing the source. Enhanced Markdown Reading is outside this feature and remains unchanged.
 
 ## User Experience
 
@@ -14,6 +16,10 @@ HTML Preview gains one `Smart reading` view action. Activating it replaces the n
 The existing `Clean up page`, `Undo cleanup`, `Manage cleanup rules`, and `View original page` actions remain unchanged in normal preview. Smart reading does not introduce a second cleanup editor or a second cleanup data format. When extraction contains unwanted content, the user returns to normal preview, hides the unwanted regions with `Clean up page`, and enters smart reading again. The saved cleanup rules are applied before the next extraction.
 
 While smart reading is active, actions that only operate on the original page cleanup runtime are unavailable. Annotation selection, existing annotation focus, internal and external link handling, images, and scroll restoration remain available where their content is present in the extracted article.
+
+Smart reading also exposes a `Save reading page` action. It opens a focused confirmation modal that identifies the current file, explains that the HTML will be replaced, and states that the prior source can be restored. Only the explicit primary confirmation performs the write. After a successful save, the current view reloads the new standalone HTML.
+
+When a backup exists, HTML Preview exposes `Restore original page`. Restore also requires confirmation because it replaces the current file. A successful restore removes the consumed backup and reloads the source. The normal temporary `View original page` action remains the cleanup comparison control and is not renamed or repurposed.
 
 ## Extraction Pipeline
 
@@ -28,7 +34,9 @@ A focused reader-document builder owns the transformation:
 7. Build a self-contained reader shell with semantic article metadata, restrained typography, responsive tables and media, and an explicit light or dark theme derived from the current Obsidian host theme.
 8. Install only the plugin-owned bridge required for annotations, navigation, and reading continuity.
 
-The builder returns the reader HTML, title/byline/excerpt metadata when available, local dependencies, diagnostics, and either a success or a typed extraction failure. It does not persist transformed HTML.
+The builder returns two related artifacts: the sandbox preview document containing the plugin bridge, and a standalone save document containing no plugin runtime. It also returns title/byline/excerpt metadata when available, local dependencies, diagnostics, and either a success or a typed extraction failure.
+
+The standalone document includes a small marker meta element, semantic article markup, the reader stylesheet, and the original relative links and media references. It contains no author scripts or plugin bridge. It must remain readable when opened directly in a browser from its Vault location.
 
 ## Cleanup Relationship
 
@@ -36,9 +44,21 @@ The source of truth remains the current versioned cleanup-rule storage under `.h
 
 Rules that no longer match continue to use the existing diagnostics and management workflow. Smart reading creates no reader-specific selectors. Undoing, deleting, resetting, or promoting an existing cleanup rule changes both normal preview and the next smart-reading render.
 
+After the reading page replaces the source, its marker tells HTML Preview not to replay cleanup rules against the already-clean standalone document. The existing rules remain stored so they are available again if the original source is restored.
+
+## Source Replacement And Backup
+
+Saving is implemented by a focused reader-page store rather than directly inside the view. For `Articles/page.html`, the backup path is `.html-preview/originals/Articles/page.html`. Parent directories are created as needed.
+
+The first save writes the current source to the backup path before replacing the Vault file. If that backup already exists, later saves never overwrite it, so repeated reader saves cannot destroy the recoverable original. Source replacement occurs only after the backup write succeeds.
+
+Restore writes the backup contents back to the source file first. It removes the backup only after the source write succeeds. This makes restore a one-level recovery operation: after restoration, a future reader save creates a new backup from the then-current source.
+
+Source replacement and restoration use Obsidian's Vault file APIs so normal modify events, sync, open views, and the preview coordinator observe the change. Neither operation modifies annotation JSON. Annotation anchors continue to use quote text, surrounding context, and source-text offsets rather than DOM coordinates. Existing annotations are re-anchored after replacement; annotations whose quoted text was not retained remain visible in the sidebar and can use the existing repair workflow.
+
 ## View State And Refresh
 
-`HtmlPreviewView` owns a two-state presentation mode: normal preview or smart reading. The selected mode is local to the open view and does not alter the HTML file. Each mode retains its own scroll position so switching back does not jump to the top.
+`HtmlPreviewView` owns a two-state presentation mode: normal preview or smart reading. Before an explicit save, the selected mode is local to the open view and does not alter the HTML file. Each mode retains its own scroll position so switching back does not jump to the top.
 
 Source-file changes, local dependency changes, cleanup-rule changes, and annotation changes rebuild the active mode through the existing preview coordinator. Render tokens continue to prevent stale iframe messages from affecting the current view. If smart extraction fails after a refresh, the view returns to normal preview and shows a concise Obsidian notice explaining that no reliable article body was found.
 
@@ -56,13 +76,15 @@ Sanitization uses parsed DOM operations rather than string replacement. It remov
 - A local resource is missing: render the rest of the article and add it to preview diagnostics.
 - A reader render becomes stale while asynchronous data is loading: discard it using the existing render-token lifecycle.
 
-No failure path rewrites the source HTML or deletes cleanup and annotation data.
+No extraction or preview failure rewrites the source HTML or deletes cleanup and annotation data. Save and restore failures show a concise error notice and preserve the last successfully written source and backup.
 
 ## Components
 
 - A reader extraction module applies cleanup rules, invokes Mozilla Readability, sanitizes the extracted article, and returns structured content or failure.
 - A reader document builder produces the isolated HTML document, reader styles, plugin bridge, dependencies, and diagnostics.
-- `HtmlPreviewView` owns mode switching, action state, per-mode scroll positions, refresh behavior, and failure fallback.
+- A reader-page store owns validated backup paths, backup creation, source replacement, and restoration ordering.
+- Two small confirmation modals own save and restore confirmation and pending/error UI.
+- `HtmlPreviewView` owns mode switching, action state, per-mode scroll positions, refresh behavior, save/restore orchestration, and failure fallback.
 - The existing cleanup locator, cleanup store, annotation service, preview coordinator, navigation policy, and diagnostics modal remain shared dependencies rather than duplicated implementations.
 - `@mozilla/readability` is bundled into `main.js`; no runtime network dependency is introduced.
 
@@ -76,8 +98,14 @@ Automated tests cover:
 - Missing article content produces a typed failure and never a blank reader page.
 - Source scripts, frames, forms, event handlers, unsafe URLs, and author styling are removed.
 - Relative links, images, tables, code blocks, and semantic article content survive transformation.
+- The standalone save document contains reader styling and content but no source script or plugin bridge.
 - The smart-reading action toggles in the current view and returns to the prior normal-preview scroll position.
 - Annotation loading and bridge installation continue in smart reading.
+- Saving is impossible without modal confirmation.
+- A successful save writes a backup before replacing the source, preserves an existing backup, and reloads the current view.
+- Restore writes the source before removing its backup; failed writes retain recoverable data.
+- Saved reading pages skip stale cleanup-rule replay, while restoring the original re-enables those rules.
+- Annotation data is not rewritten by save or restore and retained quotes re-anchor in the generated article.
 - Source, dependency, cleanup, and annotation refreshes rebuild the active mode without accepting stale messages.
 - Existing normal preview and manual cleanup tests continue to pass unchanged.
 
@@ -85,9 +113,10 @@ Final verification includes `npm run check`, a production build copied to the lo
 
 ## Non-Goals
 
-- Rewriting or replacing the saved HTML source.
 - Creating a second reader-specific cleanup rule format.
 - Executing source-page JavaScript in smart reading.
 - Building a general visual HTML editor.
-- Persisting a generated reader HTML file in the Vault.
+- Automatically replacing HTML merely by entering smart reading.
+- Embedding annotation markup or comment text into the saved HTML.
+- Keeping multiple historical source versions beyond the one recoverable backup.
 - Adding automatic extraction to Enhanced Markdown Reading, which already has a structured source document.
