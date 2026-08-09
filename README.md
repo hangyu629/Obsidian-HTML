@@ -136,9 +136,13 @@ tests/                            Vitest 单元测试与集成测试
 styles.css                       Obsidian 宿主界面样式
 ```
 
-## License
+## License / 许可证
 
-当前仓库尚未声明开源许可证。推送到公开仓库前，请根据你的发布意图添加 `LICENSE` 文件，并在此处注明许可证名称。
+This project is released under the [MIT License](LICENSE). You may use, copy,
+modify, distribute, sublicense, and sell the software, provided that the
+copyright notice and license text are included with substantial copies.
+
+本项目采用 [MIT 许可证](LICENSE)。你可以自由使用、复制、修改、分发、再许可和销售本软件，但在软件副本或主要部分中必须保留版权声明和许可证文本。软件按“现状”提供，不附带任何明示或默示担保。
 
 ## 中文快速上手
 
