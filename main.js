@@ -728,6 +728,7 @@ var ANNOTATION_DELETE_MESSAGE_TYPE = "obsidian-html-preview:annotation-delete";
 var ANNOTATION_RESULT_MESSAGE_TYPE = "obsidian-html-preview:annotation-result";
 var ANNOTATION_FOCUS_MESSAGE_TYPE = "obsidian-html-preview:annotation-focus";
 var ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE = "obsidian-html-preview:annotation-focus-result";
+var ANNOTATION_REANCHOR_MESSAGE_TYPE = "obsidian-html-preview:annotation-reanchor";
 function createAnnotationRuntimeScript(renderId, annotations = []) {
   const styleText = `
     body, body * { -webkit-user-select: text !important; user-select: text !important; }
@@ -775,6 +776,7 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
     const resultType = ${JSON.stringify(ANNOTATION_RESULT_MESSAGE_TYPE)};
     const focusType = ${JSON.stringify(ANNOTATION_FOCUS_MESSAGE_TYPE)};
     const focusResultType = ${JSON.stringify(ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE)};
+    const reanchorType = ${JSON.stringify(ANNOTATION_REANCHOR_MESSAGE_TYPE)};
     const colors = ["yellow", "green", "blue", "pink", "violet"];
     const labels = { yellow: "\u9EC4\u8272", green: "\u7EFF\u8272", blue: "\u84DD\u8272", pink: "\u7C89\u8272", violet: "\u7D2B\u8272" };
     const annotationById = new Map();
@@ -920,6 +922,10 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       }
     };
 
+    const postReanchor = (annotation) => {
+      window.parent.postMessage({ annotation, renderId, type: reanchorType }, "*");
+    };
+
     const wrapRange = (range, annotation) => {
       const nodes = textNodes().filter((node) => {
         if (node.parentElement && node.parentElement.closest("mark[data-obsidian-html-preview-annotation]")) return false;
@@ -953,11 +959,21 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       }
       const resolved = resolveTarget(annotation.target);
       if (!resolved) return false;
+      const fullText = visibleText();
+      const nextPrefix = fullText.slice(Math.max(0, resolved.start - 24), resolved.start);
+      const nextSuffix = fullText.slice(resolved.end, Math.min(fullText.length, resolved.end + 24));
+      const changed = annotation.target.start !== resolved.start ||
+        annotation.target.end !== resolved.end ||
+        annotation.target.prefix !== nextPrefix ||
+        annotation.target.suffix !== nextSuffix;
       annotation.target.start = resolved.start;
       annotation.target.end = resolved.end;
+      annotation.target.prefix = nextPrefix;
+      annotation.target.suffix = nextSuffix;
       const range = rangeFromOffsets(resolved.start, resolved.end);
       if (!range) return false;
       wrapRange(range, annotation);
+      if (changed) postReanchor(annotation);
       return true;
     };
 
@@ -1333,7 +1349,7 @@ var CLEANUP_MODE_STATE_MESSAGE_TYPE = "obsidian-html-preview:cleanup-mode-state"
 var CLEANUP_SELECTED_MESSAGE_TYPE = "obsidian-html-preview:cleanup-selected";
 var CLEANUP_UNMATCHED_MESSAGE_TYPE = "obsidian-html-preview:cleanup-unmatched";
 function createCleanupCandidate(element) {
-  const normalizedText = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+  const normalizedText2 = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
   const tag = element.tagName.toLowerCase();
   if (tag === "html" || tag === "head" || tag === "body" || element.closest("[data-html-preview-cleanup-ui]")) {
     return null;
@@ -1405,7 +1421,7 @@ function createCleanupCandidate(element) {
       classes,
       ...stableId ? { id: stableId } : {},
       tag,
-      text: normalizedText(element.textContent)
+      text: normalizedText2(element.textContent)
     },
     selector
   };
@@ -1433,7 +1449,7 @@ function installCleanupRuntime(config, candidateFactory = createCleanupCandidate
     [${uiAttribute}] { font: 13px system-ui, sans-serif !important; }
   `;
   document.head.append(style);
-  const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+  const normalize2 = (value) => (value ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
   const classScore = (element, expected) => {
     if (expected.length === 0) return 0;
     return expected.filter((name) => element.classList.contains(name)).length / expected.length;
@@ -1448,7 +1464,7 @@ function installCleanupRuntime(config, candidateFactory = createCleanupCandidate
       value += 0.2 * (attributes.filter(([name, expected]) => element.getAttribute(name) === expected).length / attributes.length);
     }
     value += 0.15 * classScore(element, fingerprint.classes);
-    const text = normalize(element.textContent);
+    const text = normalize2(element.textContent);
     if (fingerprint.text && text === fingerprint.text) value += 0.25;
     else if (fingerprint.text && (text.includes(fingerprint.text) || fingerprint.text.includes(text))) value += 0.15;
     let ancestor = element.parentElement;
@@ -2174,6 +2190,11 @@ var HtmlPreviewView = class extends import_obsidian4.FileView {
       }
       return;
     }
+    const reanchoredAnnotation = parseReanchoredAnnotation(event.data);
+    if (reanchoredAnnotation) {
+      await this.persistRecoveredAnnotation(reanchoredAnnotation);
+      return;
+    }
     const cleanupModeState = parseCleanupModeState(event.data);
     if (cleanupModeState !== null) {
       this.setCleanupMode(cleanupModeState, false);
@@ -2275,6 +2296,24 @@ var HtmlPreviewView = class extends import_obsidian4.FileView {
       },
       "*"
     );
+  }
+  async persistRecoveredAnnotation(annotation) {
+    const current = this.activeAnnotations.find((item) => item.id === annotation.id);
+    if (!current || current.target.start === annotation.target.start && current.target.end === annotation.target.end && current.target.prefix === annotation.target.prefix && current.target.suffix === annotation.target.suffix) {
+      return;
+    }
+    try {
+      this.suppressAnnotationRenders += 1;
+      await this.environment.annotationService.save(annotation.sourcePath, annotation);
+      this.activeAnnotations = [
+        ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+        annotation
+      ];
+    } catch {
+      if (this.suppressAnnotationRenders > 0) {
+        this.suppressAnnotationRenders -= 1;
+      }
+    }
   }
   async focusAnnotation(id) {
     if (!this.environment.getSettings().allowScripts || !this.frame?.contentWindow || !this.activeRenderId) return false;
@@ -2472,6 +2511,29 @@ function parseAnnotationSave(value) {
 }
 function parseAnnotationDelete(value) {
   return isRecord(value) && value.type === ANNOTATION_DELETE_MESSAGE_TYPE && validRequestId(value.requestId) && validAnnotationId(value.annotationId) ? { annotationId: value.annotationId, requestId: value.requestId } : null;
+}
+function parseReanchoredAnnotation(value) {
+  if (!isRecord(value) || value.type !== ANNOTATION_REANCHOR_MESSAGE_TYPE || !isRecord(value.annotation)) {
+    return null;
+  }
+  const annotation = value.annotation;
+  const target = annotation.target;
+  const color = annotationColor(annotation.color);
+  if (color === null || !validAnnotationId(annotation.id) || typeof annotation.sourcePath !== "string" || annotation.sourcePath.length === 0 || typeof annotation.comment !== "string" || annotation.comment.length > 1e4 || typeof annotation.quote !== "string" || annotation.quote.length === 0 || annotation.quote.length > 2e4 || !isRecord(target) || !Number.isSafeInteger(target.start) || !Number.isSafeInteger(target.end) || typeof target.start !== "number" || typeof target.end !== "number" || target.start < 0 || target.end <= target.start || target.end > 1e7 || typeof target.exact !== "string" || target.exact !== annotation.quote || typeof target.prefix !== "string" || target.prefix.length > 256 || typeof target.suffix !== "string" || target.suffix.length > 256) return null;
+  return {
+    color,
+    comment: annotation.comment,
+    id: annotation.id,
+    quote: annotation.quote,
+    sourcePath: annotation.sourcePath,
+    target: {
+      end: target.end,
+      exact: target.exact,
+      prefix: target.prefix,
+      start: target.start,
+      suffix: target.suffix
+    }
+  };
 }
 function parseAnnotationFocusResult(value) {
   return isRecord(value) && value.type === ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE && validRequestId(value.requestId) && typeof value.found === "boolean" ? { found: value.found, requestId: value.requestId } : null;
@@ -2963,6 +3025,90 @@ function textNodes(root) {
   }
   return nodes;
 }
+function visibleText(root) {
+  return textNodes(root).map((node) => node.textContent ?? "").join("");
+}
+function normalize(value) {
+  return value.replace(/\s+/g, " ").trim();
+}
+function normalizedText(value) {
+  let text = "";
+  const starts = [];
+  const ends = [];
+  let index = 0;
+  while (index < value.length) {
+    if (!/\s/.test(value[index] ?? "")) {
+      text += value[index];
+      starts.push(index);
+      ends.push(index + 1);
+      index += 1;
+      continue;
+    }
+    const start = index;
+    while (index < value.length && /\s/.test(value[index] ?? "")) index += 1;
+    if (text.length > 0 && index < value.length) {
+      text += " ";
+      starts.push(start);
+      ends.push(index);
+    }
+  }
+  return { ends, starts, text };
+}
+function matchingContext(left, right, fromEnd) {
+  const limit = Math.min(left.length, right.length);
+  let matched = 0;
+  for (let length = 1; length <= limit; length += 1) {
+    const leftPart = fromEnd ? left.slice(-length) : left.slice(0, length);
+    const rightPart = fromEnd ? right.slice(-length) : right.slice(0, length);
+    if (leftPart === rightPart) matched = length;
+  }
+  return matched;
+}
+function resolveAnnotationTarget(fullText, target) {
+  const exact = normalize(target.exact ?? "");
+  if (!exact) return null;
+  if (target.start >= 0 && target.end >= target.start && target.end <= fullText.length && normalize(fullText.slice(target.start, target.end)) === exact) {
+    return {
+      ...target,
+      prefix: fullText.slice(Math.max(0, target.start - 24), target.start),
+      suffix: fullText.slice(target.end, Math.min(fullText.length, target.end + 24))
+    };
+  }
+  const model = normalizedText(fullText);
+  const candidates = [];
+  let normalizedStart = model.text.indexOf(exact);
+  while (normalizedStart >= 0) {
+    const normalizedEnd = normalizedStart + exact.length;
+    const start = model.starts[normalizedStart];
+    const end = model.ends[normalizedEnd - 1];
+    if (typeof start === "number" && typeof end === "number") {
+      const prefix = normalize(fullText.slice(Math.max(0, start - 96), start));
+      const suffix = normalize(fullText.slice(end, Math.min(fullText.length, end + 96)));
+      candidates.push({
+        end,
+        score: matchingContext(prefix, normalize(target.prefix ?? ""), true) + matchingContext(suffix, normalize(target.suffix ?? ""), false),
+        start
+      });
+    }
+    normalizedStart = model.text.indexOf(exact, normalizedStart + 1);
+  }
+  candidates.sort(
+    (left, right) => right.score - left.score || Math.abs(left.start - target.start) - Math.abs(right.start - target.start)
+  );
+  const best = candidates[0];
+  const second = candidates[1];
+  if (!best) return null;
+  if (second && best.score === second.score && Math.abs(best.start - target.start) === Math.abs(second.start - target.start)) {
+    return null;
+  }
+  return {
+    end: best.end,
+    exact: target.exact,
+    prefix: fullText.slice(Math.max(0, best.start - 24), best.start),
+    start: best.start,
+    suffix: fullText.slice(best.end, Math.min(fullText.length, best.end + 24))
+  };
+}
 function isInside(root, node) {
   return node === root || root.contains(node);
 }
@@ -3000,11 +3146,16 @@ function captureAnnotationSelection(root, selection = window.getSelection()) {
 }
 function applyAnnotationHighlights(root, annotations) {
   const nodes = textNodes(root);
+  const fullText = visibleText(root);
+  const resolvedAnnotations = annotations.map((annotation) => {
+    const target = resolveAnnotationTarget(fullText, annotation.target);
+    return target ? { ...annotation, target } : null;
+  }).filter((annotation) => annotation !== null);
   let absoluteStart = 0;
   for (const node of nodes) {
     const length = node.textContent?.length ?? 0;
     const absoluteEnd = absoluteStart + length;
-    const segments = annotations.map((annotation) => ({
+    const segments = resolvedAnnotations.map((annotation) => ({
       annotation,
       end: Math.min(length, annotation.target.end - absoluteStart),
       start: Math.max(0, annotation.target.start - absoluteStart)
@@ -3033,6 +3184,7 @@ function applyAnnotationHighlights(root, annotations) {
     }
     absoluteStart = absoluteEnd;
   }
+  return resolvedAnnotations;
 }
 function annotationFromMark(root, target) {
   if (!(target instanceof Node)) return null;
@@ -3866,6 +4018,7 @@ var EnhancedMarkdownView = class extends import_obsidian7.FileView {
   annotationSubscription = null;
   annotationUi = null;
   annotationViewRegistration = null;
+  suppressAnnotationRenders = 0;
   viewId = `enhanced-markdown-${++nextViewId2}`;
   environmentSubscription = null;
   renderComponent = null;
@@ -4003,6 +4156,10 @@ var EnhancedMarkdownView = class extends import_obsidian7.FileView {
     this.annotationSubscription = this.environment.annotationService.subscribe(
       sourcePath,
       () => {
+        if (this.suppressAnnotationRenders > 0) {
+          this.suppressAnnotationRenders -= 1;
+          return;
+        }
         void this.render();
       }
     );
@@ -4048,14 +4205,16 @@ var EnhancedMarkdownView = class extends import_obsidian7.FileView {
         return;
       }
       const content = root.querySelector('[data-slot="content"]');
+      let resolvedAnnotations = annotations;
       if (content instanceof HTMLElement) {
-        applyAnnotationHighlights(content, annotations);
+        resolvedAnnotations = applyAnnotationHighlights(content, annotations);
       }
       this.renderComponent?.unload();
       this.renderComponent = component;
-      this.activeAnnotations = annotations;
+      this.activeAnnotations = resolvedAnnotations;
       this.contentEl.replaceChildren(root);
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
+      await this.persistRecoveredTargets(file.path, annotations, resolvedAnnotations);
     } catch (error) {
       if (token !== this.renderToken || this.file?.path !== file.path) return;
       this.showState(
@@ -4076,6 +4235,16 @@ var EnhancedMarkdownView = class extends import_obsidian7.FileView {
   captureCurrentSelection() {
     const content = this.contentRoot();
     return content ? captureAnnotationSelection(content, window.getSelection()) : null;
+  }
+  async persistRecoveredTargets(sourcePath, original, resolved) {
+    for (const annotation of resolved) {
+      const previous = original.find((candidate) => candidate.id === annotation.id);
+      if (!previous || previous.target.start === annotation.target.start && previous.target.end === annotation.target.end && previous.target.prefix === annotation.target.prefix && previous.target.suffix === annotation.target.suffix) {
+        continue;
+      }
+      this.suppressAnnotationRenders += 1;
+      await this.environment.annotationService.save(sourcePath, annotation);
+    }
   }
   focusAnnotation(id) {
     const content = this.contentRoot();

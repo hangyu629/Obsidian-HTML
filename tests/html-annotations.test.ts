@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ANNOTATION_DELETE_MESSAGE_TYPE,
+  ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE,
+  ANNOTATION_REANCHOR_MESSAGE_TYPE,
   ANNOTATION_RESULT_MESSAGE_TYPE,
   ANNOTATION_SAVE_MESSAGE_TYPE
 } from "../src/annotations/runtime";
@@ -228,6 +230,45 @@ describe("HtmlPreviewView annotations", () => {
     });
     expect(view.contentEl.querySelector("iframe")).toBe(initialFrame);
     expect(app.vault.cachedRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists a recovered HTML anchor without rebuilding the iframe", async () => {
+    const existing = existingAnnotation();
+    const { annotationService, view } = createHarness([existing]);
+    await view.onLoadFile(createFile("pages/index.html"));
+    const iframe = view.contentEl.querySelector("iframe")!;
+    const initialFrame = iframe;
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          annotation: {
+            ...existing,
+            target: {
+              ...existing.target,
+              end: 22,
+              prefix: "Intro ",
+              start: 12,
+              suffix: ""
+            }
+          },
+          renderId: "render-test",
+          type: ANNOTATION_REANCHOR_MESSAGE_TYPE
+        },
+        source: iframe.contentWindow
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(annotationService.save).toHaveBeenCalledWith(
+        "pages/index.html",
+        expect.objectContaining({
+          id: existing.id,
+          target: expect.objectContaining({ start: 12, end: 22, prefix: "Intro " })
+        })
+      );
+    });
+    expect(view.contentEl.querySelector("iframe")).toBe(initialFrame);
   });
 
   it("deletes an existing annotation and rejects unknown colors", async () => {

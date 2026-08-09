@@ -154,6 +154,34 @@ describe("EnhancedMarkdownView", () => {
     );
   });
 
+  it("persists recovered annotation anchors after Markdown text shifts", async () => {
+    const existing: HtmlAnnotation = {
+      color: "yellow",
+      comment: "important note",
+      id: "11111111111111111111111111111111",
+      quote: "Alpha beta",
+      sourcePath: "notes/example.md",
+      target: { end: 10, exact: "Alpha beta", prefix: "", start: 0, suffix: " gamma" }
+    };
+    const { annotationService, view } = harness(
+      async () => "Intro Alpha beta gamma",
+      vi.fn(() => ({ source: "default" as const, templateId: "book-editorial", themeId: "light" })),
+      [existing]
+    );
+
+    await view.onLoadFile(file("notes/example.md"));
+
+    await vi.waitFor(() => {
+      expect(annotationService.save).toHaveBeenCalledWith(
+        "notes/example.md",
+        expect.objectContaining({
+          id: existing.id,
+          target: expect.objectContaining({ start: 6, end: 16, prefix: "Intro " })
+        })
+      );
+    });
+  });
+
   it("ignores a stale source read after the file changes", async () => {
     let release!: (value: string) => void;
     const first = new Promise<string>((resolve) => {

@@ -10,6 +10,8 @@ export const ANNOTATION_FOCUS_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-focus" as const;
 export const ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-focus-result" as const;
+export const ANNOTATION_REANCHOR_MESSAGE_TYPE =
+  "obsidian-html-preview:annotation-reanchor" as const;
 
 export function createAnnotationRuntimeScript(
   renderId: string,
@@ -62,6 +64,7 @@ export function createAnnotationRuntimeScript(
     const resultType = ${JSON.stringify(ANNOTATION_RESULT_MESSAGE_TYPE)};
     const focusType = ${JSON.stringify(ANNOTATION_FOCUS_MESSAGE_TYPE)};
     const focusResultType = ${JSON.stringify(ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE)};
+    const reanchorType = ${JSON.stringify(ANNOTATION_REANCHOR_MESSAGE_TYPE)};
     const colors = ["yellow", "green", "blue", "pink", "violet"];
     const labels = { yellow: "黄色", green: "绿色", blue: "蓝色", pink: "粉色", violet: "紫色" };
     const annotationById = new Map();
@@ -207,6 +210,10 @@ export function createAnnotationRuntimeScript(
       }
     };
 
+    const postReanchor = (annotation) => {
+      window.parent.postMessage({ annotation, renderId, type: reanchorType }, "*");
+    };
+
     const wrapRange = (range, annotation) => {
       const nodes = textNodes().filter((node) => {
         if (node.parentElement && node.parentElement.closest("mark[data-obsidian-html-preview-annotation]")) return false;
@@ -240,11 +247,21 @@ export function createAnnotationRuntimeScript(
       }
       const resolved = resolveTarget(annotation.target);
       if (!resolved) return false;
+      const fullText = visibleText();
+      const nextPrefix = fullText.slice(Math.max(0, resolved.start - 24), resolved.start);
+      const nextSuffix = fullText.slice(resolved.end, Math.min(fullText.length, resolved.end + 24));
+      const changed = annotation.target.start !== resolved.start ||
+        annotation.target.end !== resolved.end ||
+        annotation.target.prefix !== nextPrefix ||
+        annotation.target.suffix !== nextSuffix;
       annotation.target.start = resolved.start;
       annotation.target.end = resolved.end;
+      annotation.target.prefix = nextPrefix;
+      annotation.target.suffix = nextSuffix;
       const range = rangeFromOffsets(resolved.start, resolved.end);
       if (!range) return false;
       wrapRange(range, annotation);
+      if (changed) postReanchor(annotation);
       return true;
     };
 

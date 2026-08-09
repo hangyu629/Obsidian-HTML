@@ -5,6 +5,7 @@ import {
   ANNOTATION_DELETE_MESSAGE_TYPE,
   ANNOTATION_FOCUS_MESSAGE_TYPE,
   ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE,
+  ANNOTATION_REANCHOR_MESSAGE_TYPE,
   ANNOTATION_RESULT_MESSAGE_TYPE,
   ANNOTATION_SAVE_MESSAGE_TYPE
 } from "./annotations/runtime";
@@ -420,6 +421,12 @@ export class HtmlPreviewView extends FileView {
       return;
     }
 
+    const reanchoredAnnotation = parseReanchoredAnnotation(event.data);
+    if (reanchoredAnnotation) {
+      await this.persistRecoveredAnnotation(reanchoredAnnotation);
+      return;
+    }
+
     const cleanupModeState = parseCleanupModeState(event.data);
     if (cleanupModeState !== null) {
       this.setCleanupMode(cleanupModeState, false);
@@ -541,6 +548,28 @@ export class HtmlPreviewView extends FileView {
       },
       "*"
     );
+  }
+
+  private async persistRecoveredAnnotation(annotation: HtmlAnnotation): Promise<void> {
+    const current = this.activeAnnotations.find((item) => item.id === annotation.id);
+    if (!current || current.target.start === annotation.target.start &&
+      current.target.end === annotation.target.end &&
+      current.target.prefix === annotation.target.prefix &&
+      current.target.suffix === annotation.target.suffix) {
+      return;
+    }
+    try {
+      this.suppressAnnotationRenders += 1;
+      await this.environment.annotationService.save(annotation.sourcePath, annotation);
+      this.activeAnnotations = [
+        ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+        annotation
+      ];
+    } catch {
+      if (this.suppressAnnotationRenders > 0) {
+        this.suppressAnnotationRenders -= 1;
+      }
+    }
   }
 
   async focusAnnotation(id: string): Promise<boolean> {
@@ -781,6 +810,44 @@ function parseAnnotationDelete(value: unknown): AnnotationDeleteMessage | null {
     validAnnotationId(value.annotationId)
     ? { annotationId: value.annotationId, requestId: value.requestId }
     : null;
+}
+
+function parseReanchoredAnnotation(value: unknown): HtmlAnnotation | null {
+  if (!isRecord(value) || value.type !== ANNOTATION_REANCHOR_MESSAGE_TYPE || !isRecord(value.annotation)) {
+    return null;
+  }
+  const annotation = value.annotation;
+  const target = annotation.target;
+  const color = annotationColor(annotation.color);
+  if (
+    color === null ||
+    !validAnnotationId(annotation.id) ||
+    typeof annotation.sourcePath !== "string" || annotation.sourcePath.length === 0 ||
+    typeof annotation.comment !== "string" || annotation.comment.length > 10_000 ||
+    typeof annotation.quote !== "string" || annotation.quote.length === 0 ||
+    annotation.quote.length > 20_000 ||
+    !isRecord(target) ||
+    !Number.isSafeInteger(target.start) || !Number.isSafeInteger(target.end) ||
+    typeof target.start !== "number" || typeof target.end !== "number" ||
+    target.start < 0 || target.end <= target.start || target.end > 10_000_000 ||
+    typeof target.exact !== "string" || target.exact !== annotation.quote ||
+    typeof target.prefix !== "string" || target.prefix.length > 256 ||
+    typeof target.suffix !== "string" || target.suffix.length > 256
+  ) return null;
+  return {
+    color,
+    comment: annotation.comment,
+    id: annotation.id,
+    quote: annotation.quote,
+    sourcePath: annotation.sourcePath,
+    target: {
+      end: target.end,
+      exact: target.exact,
+      prefix: target.prefix,
+      start: target.start,
+      suffix: target.suffix
+    }
+  };
 }
 
 function parseAnnotationFocusResult(

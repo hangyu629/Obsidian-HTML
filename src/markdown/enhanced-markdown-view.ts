@@ -56,6 +56,7 @@ export class EnhancedMarkdownView extends FileView {
   private annotationSubscription: (() => void) | null = null;
   private annotationUi: AnnotationContextualUi | null = null;
   private annotationViewRegistration: (() => void) | null = null;
+  private suppressAnnotationRenders = 0;
   private readonly viewId = `enhanced-markdown-${++nextViewId}`;
   private environmentSubscription: (() => void) | null = null;
   private renderComponent: Component | null = null;
@@ -214,6 +215,10 @@ export class EnhancedMarkdownView extends FileView {
     this.annotationSubscription = this.environment.annotationService.subscribe(
       sourcePath,
       () => {
+        if (this.suppressAnnotationRenders > 0) {
+          this.suppressAnnotationRenders -= 1;
+          return;
+        }
         void this.render();
       }
     );
@@ -267,14 +272,16 @@ export class EnhancedMarkdownView extends FileView {
         return;
       }
       const content = root.querySelector('[data-slot="content"]');
+      let resolvedAnnotations = annotations;
       if (content instanceof HTMLElement) {
-        applyAnnotationHighlights(content, annotations);
+        resolvedAnnotations = applyAnnotationHighlights(content, annotations);
       }
       this.renderComponent?.unload();
       this.renderComponent = component;
-      this.activeAnnotations = annotations;
+      this.activeAnnotations = resolvedAnnotations;
       this.contentEl.replaceChildren(root);
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
+      await this.persistRecoveredTargets(file.path, annotations, resolvedAnnotations);
     } catch (error) {
       if (token !== this.renderToken || this.file?.path !== file.path) return;
       this.showState(
@@ -302,6 +309,24 @@ export class EnhancedMarkdownView extends FileView {
     return content
       ? captureAnnotationSelection(content, window.getSelection())
       : null;
+  }
+
+  private async persistRecoveredTargets(
+    sourcePath: string,
+    original: readonly HtmlAnnotation[],
+    resolved: readonly HtmlAnnotation[]
+  ): Promise<void> {
+    for (const annotation of resolved) {
+      const previous = original.find((candidate) => candidate.id === annotation.id);
+      if (!previous || previous.target.start === annotation.target.start &&
+        previous.target.end === annotation.target.end &&
+        previous.target.prefix === annotation.target.prefix &&
+        previous.target.suffix === annotation.target.suffix) {
+        continue;
+      }
+      this.suppressAnnotationRenders += 1;
+      await this.environment.annotationService.save(sourcePath, annotation);
+    }
   }
 
   focusAnnotation(id: string): boolean {

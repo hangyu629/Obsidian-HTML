@@ -169,11 +169,25 @@ describe("annotation mark helpers", () => {
     document.body.append(root);
     const current = annotation();
 
-    applyAnnotationHighlights(root, [current]);
+    const resolved = applyAnnotationHighlights(root, [current]);
 
     const mark = root.querySelector("mark")!;
     expect(mark.dataset.annotationColor).toBe("green");
     expect(annotationFromMark(root, mark.firstChild)).toBe(current.id);
+    expect(resolved[0]?.target.start).toBe(0);
+  });
+
+  it("re-anchors a moved annotation using its stored context", () => {
+    const root = document.createElement("div");
+    root.textContent = "Intro Alpha beta gamma";
+    document.body.append(root);
+
+    const [resolved] = applyAnnotationHighlights(root, [annotation()]);
+
+    expect(root.querySelector("mark")?.textContent).toBe("Alpha beta");
+    expect(resolved?.target.start).toBe(6);
+    expect(resolved?.target.end).toBe(16);
+    expect(resolved?.target.prefix).toBe("Intro ");
   });
 
   it("focuses a matching mark and reports missing ids", () => {
