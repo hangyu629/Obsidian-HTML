@@ -91,6 +91,10 @@ describe("AnnotationSidebarView", () => {
     expect(items[0]?.querySelector(".annotation-sidebar-comment")).toBeNull();
     expect(items[1]?.querySelector(".annotation-sidebar-comment")?.textContent)
       .toBe("Follow this idea");
+    expect(items[1]?.querySelector(".annotation-sidebar-comment-label")?.textContent)
+      .toBe("批注");
+    expect(items[0]?.querySelector(".annotation-sidebar-highlight-label")?.textContent)
+      .toBe("仅高亮");
   });
 
   it("filters comment and highlight-only entries", async () => {
