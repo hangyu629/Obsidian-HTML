@@ -281,7 +281,7 @@ export default class HtmlPreviewPlugin extends Plugin {
     } else if (activeLeaf?.view?.getViewType?.() === ANNOTATION_SIDEBAR_VIEW_TYPE) {
       sourcePath = this.lastAnnotationSourcePath;
     } else {
-      this.lastAnnotationSourcePath = null;
+      sourcePath = this.lastAnnotationSourcePath;
     }
     for (const leaf of this.app.workspace.getLeavesOfType?.(
       ANNOTATION_SIDEBAR_VIEW_TYPE

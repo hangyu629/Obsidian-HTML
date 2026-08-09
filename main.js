@@ -4899,7 +4899,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
     } else if (activeLeaf?.view?.getViewType?.() === ANNOTATION_SIDEBAR_VIEW_TYPE) {
       sourcePath = this.lastAnnotationSourcePath;
     } else {
-      this.lastAnnotationSourcePath = null;
+      sourcePath = this.lastAnnotationSourcePath;
     }
     for (const leaf of this.app.workspace.getLeavesOfType?.(
       ANNOTATION_SIDEBAR_VIEW_TYPE

@@ -233,4 +233,48 @@ describe("Markdown plugin integration", () => {
       "打开 HTML 或 Markdown 文件以查看注释"
     );
   });
+
+  it("keeps annotation sidebar content when switching to another non-document tab", async () => {
+    const { app, workspaceLeaves } = appHarness();
+    const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
+    await plugin.onload();
+    const factory = (plugin as unknown as {
+      registeredViews: Map<string, (leaf: unknown) => any>;
+    }).registeredViews.get(ANNOTATION_SIDEBAR_VIEW_TYPE)!;
+    const sidebarLeaf = Object.assign(Object.create(Object.prototype), { app });
+    const sidebar = factory(sidebarLeaf);
+    sidebarLeaf.view = sidebar;
+    sidebar.onload();
+    workspaceLeaves.push(sidebarLeaf);
+    const documentLeaf = {
+      view: {
+        file: Object.assign(Object.create(TFile.prototype), {
+          basename: "Note",
+          extension: "md",
+          name: "Note.md",
+          path: "notes/Note.md"
+        })
+      }
+    };
+    const outlineLeaf = {
+      view: {
+        getViewType: () => "outline"
+      }
+    };
+
+    await (plugin as unknown as {
+      updateAnnotationSidebars(leaf: unknown): Promise<void>;
+    }).updateAnnotationSidebars(documentLeaf);
+    expect(sidebar.contentEl.textContent).toContain("当前文件还没有注释");
+
+    await (plugin as unknown as {
+      updateAnnotationSidebars(leaf: unknown): Promise<void>;
+    }).updateAnnotationSidebars(outlineLeaf);
+    expect(sidebar.contentEl.textContent).toContain("当前文件还没有注释");
+
+    await (plugin as unknown as {
+      updateAnnotationSidebars(leaf: unknown): Promise<void>;
+    }).updateAnnotationSidebars(sidebarLeaf);
+    expect(sidebar.contentEl.textContent).toContain("当前文件还没有注释");
+  });
 });
