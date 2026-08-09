@@ -654,7 +654,12 @@ var AnnotationSidebarView = class extends import_obsidian4.ItemView {
     const filters = document.createElement("div");
     filters.className = "annotation-sidebar-filters";
     filters.setAttribute("role", "toolbar");
-    filters.setAttribute("aria-label", "\u7B5B\u9009\u6CE8\u91CA");
+    const filterLabel = document.createElement("span");
+    filterLabel.className = "annotation-sidebar-sr-only";
+    filterLabel.id = `${this.managementId}-filters-label`;
+    filterLabel.textContent = "\u7B5B\u9009\u6CE8\u91CA";
+    filters.setAttribute("aria-labelledby", filterLabel.id);
+    filters.append(filterLabel);
     for (const [value, label] of [
       ["all", "\u5168\u90E8"],
       ["comments", "\u6709\u6279\u6CE8"],
@@ -673,15 +678,21 @@ var AnnotationSidebarView = class extends import_obsidian4.ItemView {
     }
     const managementToggle = document.createElement("button");
     managementToggle.type = "button";
-    managementToggle.className = "clickable-icon annotation-sidebar-management-toggle";
-    managementToggle.setAttribute("aria-label", "Manage annotations");
+    managementToggle.className = "annotation-sidebar-management-toggle";
     managementToggle.setAttribute("aria-controls", this.managementId);
     managementToggle.setAttribute("aria-expanded", String(this.managementOpen));
-    managementToggle.title = "\u6574\u7406\u6CE8\u91CA";
     (0, import_obsidian4.setIcon)(managementToggle, "sliders-horizontal");
+    const managementLabel = document.createElement("span");
+    managementLabel.className = "annotation-sidebar-sr-only";
+    managementLabel.textContent = "\u6574\u7406\u6CE8\u91CA";
+    managementToggle.append(managementLabel);
     managementToggle.addEventListener("click", () => {
       this.managementOpen = !this.managementOpen;
-      this.render();
+      managementToggle.setAttribute("aria-expanded", String(this.managementOpen));
+      const management2 = this.contentEl.querySelector(
+        `#${this.managementId}`
+      );
+      if (management2) management2.hidden = !this.managementOpen;
     });
     filters.append(managementToggle);
     fragment.append(filters);
@@ -710,7 +721,8 @@ var AnnotationSidebarView = class extends import_obsidian4.ItemView {
     bulkDelete.type = "button";
     bulkDelete.className = "annotation-sidebar-bulk-delete";
     bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
-    bulkDelete.textContent = "\u5220\u9664\u5F53\u524D\u7B5B\u9009";
+    bulkDelete.title = "\u5220\u9664\u5F53\u524D\u7B5B\u9009";
+    (0, import_obsidian4.setIcon)(bulkDelete, "trash-2");
     const bulkColor = document.createElement("select");
     bulkColor.className = "annotation-sidebar-bulk-color";
     bulkColor.setAttribute("aria-label", "Batch annotation color");
@@ -736,9 +748,6 @@ var AnnotationSidebarView = class extends import_obsidian4.ItemView {
     exportButton.setAttribute("aria-label", "Export annotations as Markdown");
     exportButton.title = "\u5BFC\u51FA\u5168\u90E8\u6CE8\u91CA\u4E3A Markdown";
     (0, import_obsidian4.setIcon)(exportButton, "file-down");
-    const exportLabel = document.createElement("span");
-    exportLabel.textContent = "\u5BFC\u51FA";
-    exportButton.append(exportLabel);
     exportButton.addEventListener("click", () => {
       const sourcePath = this.sourcePath;
       if (!sourcePath) return;

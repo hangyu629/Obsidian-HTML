@@ -21,7 +21,8 @@ Status legend:
 - [x] `done` Harden re-anchor heuristics for repeated quotes and larger text rewrites
 - [x] `done` Reorganize annotation sidebar management tools into a responsive drawer with destructive-action confirmation
 - [x] `done` Remove the redundant repair action from annotation cards; card clicks already navigate to highlights
-- [x] `done` Align sidebar sections to one gutter and place item actions inside responsive annotation cards
+- [x] `done` Replace the oversized card layout with a compact one-row management toolbar and a lightweight aligned annotation list
+- [x] `done` Prevent stale annotation paint after expanding or collapsing management controls
 
 ## Next Roadmap
 

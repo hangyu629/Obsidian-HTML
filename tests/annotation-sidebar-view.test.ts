@@ -142,10 +142,16 @@ describe("AnnotationSidebarView", () => {
   it("toggles a compact management band and preserves it across filters", async () => {
     const { view } = harness();
     await view.setSource("notes/a.md");
+    const filters = view.contentEl.querySelector<HTMLElement>(
+      ".annotation-sidebar-filters"
+    )!;
     const toggle = view.contentEl.querySelector<HTMLButtonElement>(
-      '[aria-label="Manage annotations"]'
+      ".annotation-sidebar-management-toggle"
     );
 
+    expect(filters.hasAttribute("aria-label")).toBe(false);
+    const filterLabelId = filters.getAttribute("aria-labelledby")!;
+    expect(filters.querySelector(`#${filterLabelId}`)?.textContent).toBe("筛选注释");
     expect(toggle).not.toBeNull();
     const managementId = toggle?.getAttribute("aria-controls") ?? "";
     expect(managementId).not.toBe("");
@@ -163,6 +169,54 @@ describe("AnnotationSidebarView", () => {
     await view.setSource("notes/b.md");
     expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
       .toBe(true);
+  });
+
+  it("toggles management controls without replacing annotation entries", async () => {
+    const { view } = harness();
+    await view.setSource("notes/a.md");
+    const entry = view.contentEl.querySelector(".annotation-sidebar-entry");
+    const toggle = view.contentEl.querySelector<HTMLButtonElement>(
+      ".annotation-sidebar-management-toggle"
+    )!;
+    expect(toggle.hasAttribute("title")).toBe(false);
+    expect(toggle.hasAttribute("aria-label")).toBe(false);
+    expect(toggle.classList.contains("clickable-icon")).toBe(false);
+    expect(toggle.querySelector(".annotation-sidebar-sr-only")?.textContent)
+      .toBe("整理注释");
+
+    toggle.click();
+
+    expect(view.contentEl.querySelector(".annotation-sidebar-entry")).toBe(entry);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    const managementId = toggle.getAttribute("aria-controls")!;
+    expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
+      .toBe(false);
+
+    toggle.click();
+
+    expect(view.contentEl.querySelector(".annotation-sidebar-entry")).toBe(entry);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(view.contentEl.querySelector<HTMLElement>(`#${managementId}`)?.hidden)
+      .toBe(true);
+  });
+
+  it("uses icon-only export and delete actions in the compact management row", async () => {
+    const { view } = harness();
+    await view.setSource("notes/a.md");
+
+    const management = view.contentEl.querySelector(".annotation-sidebar-management")!;
+    expect(management.children).toHaveLength(4);
+    expect(management.querySelectorAll("select")).toHaveLength(2);
+    const exportButton = management.querySelector<HTMLButtonElement>(
+      '[aria-label="Export annotations as Markdown"]'
+    )!;
+    const deleteButton = management.querySelector<HTMLButtonElement>(
+      '[aria-label="Delete filtered annotations"]'
+    )!;
+    expect(exportButton.textContent).toBe("");
+    expect(deleteButton.textContent).toBe("");
+    expect(exportButton.dataset.icon).toBe("file-down");
+    expect(deleteButton.dataset.icon).toBe("trash-2");
   });
 
   it("changes sort order and confirms before deleting filtered annotations", async () => {
@@ -185,7 +239,7 @@ describe("AnnotationSidebarView", () => {
     clickByText(view.contentEl, "有批注");
     document.body.replaceChildren(view.containerEl);
     view.contentEl.querySelector<HTMLButtonElement>(
-      '[aria-label="Manage annotations"]'
+      ".annotation-sidebar-management-toggle"
     )?.click();
     view.contentEl.querySelector<HTMLButtonElement>('[aria-label="Delete filtered annotations"]')?.click();
 
@@ -352,25 +406,24 @@ describe("AnnotationSidebarView", () => {
     expect(css).toContain("white-space: normal");
   });
 
-  it("aligns sidebar sections and keeps actions inside annotation cards", () => {
+  it("aligns sidebar sections as a compact toolbar and lightweight list", () => {
     const css = readFileSync("styles.css", "utf8");
 
+    expect(css).not.toMatch(/\.annotation-sidebar\s*\{[^}]*container-type:/);
+    expect(css).not.toContain("@container");
     expect(css).toMatch(
       /\.annotation-sidebar\s*\{[^}]*--annotation-sidebar-gutter:\s*12px;/
     );
     expect(css.match(/padding-inline:\s*var\(--annotation-sidebar-gutter\);/g))
       .toHaveLength(4);
     expect(css).toMatch(
-      /\.annotation-sidebar-entry\s*\{[^}]*position:\s*relative;[^}]*display:\s*block;/
+      /\.annotation-sidebar-management\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) minmax\(0, 1fr\) 30px 30px;/
     );
     expect(css).toMatch(
-      /\.annotation-sidebar-actions\s*\{[^}]*position:\s*absolute;[^}]*top:\s*8px;[^}]*right:\s*8px;/
+      /\.annotation-sidebar-entry\s*\{[^}]*position:\s*relative;[^}]*border-bottom:\s*1px solid var\(--background-modifier-border\);/
     );
     expect(css).toMatch(
-      /\.annotation-sidebar-entry:has\(\.annotation-sidebar-item\.is-unresolved\)\s*\{[^}]*border-color:\s*var\(--text-warning\);/
-    );
-    expect(css).toMatch(
-      /\.annotation-sidebar-sort,[\s\S]*?\.annotation-sidebar-bulk-color\s*\{[^}]*border:\s*1px solid var\(--background-modifier-border\);/
+      /\.annotation-sidebar-actions\s*\{[^}]*position:\s*absolute;[^}]*top:\s*8px;[^}]*right:\s*0;/
     );
   });
 });

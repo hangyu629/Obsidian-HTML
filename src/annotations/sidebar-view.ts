@@ -145,7 +145,12 @@ export class AnnotationSidebarView extends ItemView {
     const filters = document.createElement("div");
     filters.className = "annotation-sidebar-filters";
     filters.setAttribute("role", "toolbar");
-    filters.setAttribute("aria-label", "筛选注释");
+    const filterLabel = document.createElement("span");
+    filterLabel.className = "annotation-sidebar-sr-only";
+    filterLabel.id = `${this.managementId}-filters-label`;
+    filterLabel.textContent = "筛选注释";
+    filters.setAttribute("aria-labelledby", filterLabel.id);
+    filters.append(filterLabel);
     for (const [value, label] of [
       ["all", "全部"],
       ["comments", "有批注"],
@@ -164,16 +169,21 @@ export class AnnotationSidebarView extends ItemView {
     }
     const managementToggle = document.createElement("button");
     managementToggle.type = "button";
-    managementToggle.className =
-      "clickable-icon annotation-sidebar-management-toggle";
-    managementToggle.setAttribute("aria-label", "Manage annotations");
+    managementToggle.className = "annotation-sidebar-management-toggle";
     managementToggle.setAttribute("aria-controls", this.managementId);
     managementToggle.setAttribute("aria-expanded", String(this.managementOpen));
-    managementToggle.title = "整理注释";
     setIcon(managementToggle, "sliders-horizontal");
+    const managementLabel = document.createElement("span");
+    managementLabel.className = "annotation-sidebar-sr-only";
+    managementLabel.textContent = "整理注释";
+    managementToggle.append(managementLabel);
     managementToggle.addEventListener("click", () => {
       this.managementOpen = !this.managementOpen;
-      this.render();
+      managementToggle.setAttribute("aria-expanded", String(this.managementOpen));
+      const management = this.contentEl.querySelector<HTMLElement>(
+        `#${this.managementId}`
+      );
+      if (management) management.hidden = !this.managementOpen;
     });
     filters.append(managementToggle);
     fragment.append(filters);
@@ -203,7 +213,8 @@ export class AnnotationSidebarView extends ItemView {
     bulkDelete.type = "button";
     bulkDelete.className = "annotation-sidebar-bulk-delete";
     bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
-    bulkDelete.textContent = "删除当前筛选";
+    bulkDelete.title = "删除当前筛选";
+    setIcon(bulkDelete, "trash-2");
     const bulkColor = document.createElement("select");
     bulkColor.className = "annotation-sidebar-bulk-color";
     bulkColor.setAttribute("aria-label", "Batch annotation color");
@@ -229,9 +240,6 @@ export class AnnotationSidebarView extends ItemView {
     exportButton.setAttribute("aria-label", "Export annotations as Markdown");
     exportButton.title = "导出全部注释为 Markdown";
     setIcon(exportButton, "file-down");
-    const exportLabel = document.createElement("span");
-    exportLabel.textContent = "导出";
-    exportButton.append(exportLabel);
     exportButton.addEventListener("click", () => {
       const sourcePath = this.sourcePath;
       if (!sourcePath) return;

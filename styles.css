@@ -335,7 +335,6 @@
   padding: 0;
   color: var(--text-normal);
   background: var(--background-secondary);
-  container-type: inline-size;
 }
 
 .annotation-sidebar-header {
@@ -389,11 +388,18 @@
 }
 
 .annotation-sidebar-management-toggle {
+  display: grid;
+  place-items: center;
   flex: 0 0 auto;
   width: 28px;
   height: 28px;
   margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
   color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
 }
 
 .annotation-sidebar-management-toggle:hover,
@@ -402,14 +408,23 @@
   background: var(--background-modifier-hover);
 }
 
+.annotation-sidebar-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .annotation-sidebar-management {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-  padding-block: 10px 11px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 30px;
+  gap: 6px;
+  padding-block: 8px;
   padding-inline: var(--annotation-sidebar-gutter);
   border-bottom: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary-alt);
+  background: var(--background-secondary);
 }
 
 .annotation-sidebar-management[hidden] {
@@ -420,10 +435,10 @@
 .annotation-sidebar-bulk-color {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 5px 30px 5px 10px;
+  min-height: 30px;
+  padding: 4px 25px 4px 8px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--text-normal);
   background-color: var(--background-primary);
   box-shadow: none;
@@ -432,31 +447,27 @@
 }
 
 .annotation-sidebar-bulk-delete {
-  width: 100%;
-  min-height: 32px;
-  padding: 5px 10px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--text-error);
   background: var(--background-primary);
-  font-size: var(--font-ui-smaller);
-  letter-spacing: 0;
 }
 
 .annotation-sidebar-export {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 100%;
-  min-height: 32px;
-  padding: 5px 9px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  color: var(--text-normal);
+  border-radius: 5px;
+  color: var(--text-muted);
   background: var(--background-primary);
-  font-size: var(--font-ui-smaller);
-  letter-spacing: 0;
 }
 
 .annotation-sidebar-export:hover,
@@ -488,26 +499,10 @@
   background: var(--background-primary);
 }
 
-@container (max-width: 280px) {
-  .annotation-sidebar-management {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .annotation-sidebar-actions {
-    position: static;
-    justify-content: flex-end;
-    padding: 0 8px 8px;
-  }
-
-  .annotation-sidebar-quote {
-    padding-right: 0;
-  }
-}
-
 .annotation-sidebar-list {
   display: grid;
-  gap: 8px;
-  padding-block: 10px 12px;
+  gap: 0;
+  padding-block: 2px 12px;
   padding-inline: var(--annotation-sidebar-gutter);
 }
 
@@ -515,27 +510,23 @@
   position: relative;
   display: block;
   min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 7px;
-  background: var(--background-primary);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  border-bottom: 1px solid var(--background-modifier-border);
+  transition: background-color 120ms ease;
 }
 
 .annotation-sidebar-entry:hover,
 .annotation-sidebar-entry:focus-within {
-  border-color: var(--background-modifier-border-hover);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  background: var(--background-modifier-hover);
 }
 
-.annotation-sidebar-entry:has(.annotation-sidebar-item.is-unresolved) {
-  border-color: var(--text-warning);
+.annotation-sidebar-entry:last-child {
+  border-bottom: 0;
 }
 
 .annotation-sidebar-actions {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 0;
   z-index: 1;
   display: flex;
   gap: 2px;
@@ -544,12 +535,12 @@
 }
 
 .annotation-sidebar-action {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
-  color: var(--text-muted);
+  border-radius: 5px;
+  color: var(--text-faint);
 }
 
 .annotation-sidebar-action:hover {
@@ -563,10 +554,9 @@
   width: 100%;
   height: auto;
   min-width: 0;
-  padding: 11px 12px 12px 18px;
-  overflow: hidden;
+  padding: 10px 0 11px 14px;
   border: 0;
-  border-radius: inherit;
+  border-radius: 4px;
   color: var(--text-normal);
   background: transparent;
   box-shadow: none;
@@ -578,9 +568,9 @@
 
 .annotation-sidebar-item::before {
   position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: 7px;
+  top: 11px;
+  bottom: 11px;
+  left: 2px;
   width: 3px;
   border-radius: 3px;
   background: var(--annotation-marker);
@@ -635,7 +625,7 @@
 }
 
 .annotation-sidebar-quote {
-  padding-right: 96px;
+  padding-right: 80px;
   -webkit-line-clamp: 2;
   color: var(--text-muted);
   font-family: var(--font-text);
@@ -645,10 +635,9 @@
 
 .annotation-sidebar-note {
   display: block;
-  margin-top: 10px;
-  padding: 9px 0 0;
+  margin-top: 7px;
+  padding: 0 4px 0 0;
   border: 0;
-  border-top: 1px solid var(--background-modifier-border);
   border-radius: 0;
   background: transparent;
   white-space: normal;
@@ -656,8 +645,8 @@
 
 .annotation-sidebar-comment-label {
   display: block;
-  margin-bottom: 3px;
-  color: var(--text-muted);
+  margin-bottom: 2px;
+  color: var(--text-faint);
   font-size: var(--font-ui-smaller);
   font-weight: 650;
   line-height: 1.3;
