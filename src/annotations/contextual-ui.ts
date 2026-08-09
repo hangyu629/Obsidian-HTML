@@ -38,8 +38,23 @@ export class AnnotationContextualUi {
     private readonly callbacks: AnnotationContextualUiCallbacks
   ) {}
 
-  showSelection(selection: AnnotationSelection, anchor: DOMRect): void {
+  showSelection(
+    selection: AnnotationSelection,
+    anchor: DOMRect,
+    existing?: HtmlAnnotation
+  ): void {
     this.close();
+    const initial: AnnotationDraft = {
+      color: existing ? annotationDisplayColor(existing) : "yellow",
+      comment: existing?.comment ?? "",
+      ...(existing?.id ? { id: existing.id } : {}),
+      quote: selection.quote,
+      target: selection.target
+    };
+    if (existing) {
+      this.showEditor(initial, anchor, existing, true);
+      return;
+    }
     const toolbar = this.createSurface("div", "annotation-selection-toolbar");
     toolbar.setAttribute("role", "toolbar");
     toolbar.setAttribute("aria-label", "选中文字操作");
@@ -53,13 +68,12 @@ export class AnnotationContextualUi {
         existing.remove();
         return;
       }
-      const palette = this.createPalette(lastUsedColor, async (selected) => {
+      const palette = this.createPalette(existing ? initial.color : lastUsedColor, async (selected) => {
         lastUsedColor = selected;
         const saved = await this.save({
+          ...initial,
           color: selected,
-          comment: "",
-          quote: selection.quote,
-          target: selection.target
+          comment: initial.comment
         });
         if (saved) this.close();
       });
@@ -70,12 +84,11 @@ export class AnnotationContextualUi {
     comment.addEventListener("click", () => {
       this.showEditor(
         {
-          color: "yellow",
-          comment: "",
-          quote: selection.quote,
-          target: selection.target
+          ...initial,
+          color: existing ? initial.color : "yellow"
         },
-        anchor
+        anchor,
+        existing
       );
     });
     toolbar.append(color, comment);
@@ -108,22 +121,29 @@ export class AnnotationContextualUi {
   private showEditor(
     initial: AnnotationDraft,
     anchor: DOMRect,
-    existing?: HtmlAnnotation
+    existing?: HtmlAnnotation,
+    repairing = false
   ): void {
     this.close();
     const draft = { ...initial };
     const editor = this.createSurface("div", "annotation-editor");
     editor.setAttribute("role", "dialog");
-    editor.setAttribute("aria-label", existing ? "编辑注释" : "添加注释");
+    editor.setAttribute("aria-label", repairing ? "重新定位批注" : (existing ? "编辑注释" : "添加注释"));
 
     const header = document.createElement("div");
     header.className = "annotation-editor-header";
     const title = document.createElement("strong");
-    title.textContent = existing ? "编辑注释" : "添加注释";
+    title.textContent = repairing ? "重新定位批注" : (existing ? "编辑注释" : "添加注释");
     const close = this.button("×", "annotation-editor-close");
     close.setAttribute("aria-label", "关闭");
     close.addEventListener("click", () => this.close());
     header.append(title, close);
+    if (repairing) {
+      const hint = document.createElement("p");
+      hint.className = "annotation-editor-repair-hint";
+      hint.textContent = "已替换摘录位置，保存后将更新这条批注。";
+      header.append(hint);
+    }
 
     const quote = document.createElement("blockquote");
     quote.className = "annotation-editor-quote";

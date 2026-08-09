@@ -158,6 +158,14 @@
   padding: 8px 10px 6px 14px;
 }
 
+.annotation-editor-repair-hint {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-normal);
+  line-height: 1.4;
+}
+
 .annotation-editor-header strong {
   font-size: var(--font-ui-small);
   font-weight: 650;

@@ -77,6 +77,8 @@ export default class HtmlPreviewPlugin extends Plugin {
           annotationService: this.annotationService,
           exportAnnotations: (sourcePath, annotations) =>
             this.exportAnnotations(sourcePath, annotations),
+          repairAnnotation: (sourcePath, id) =>
+            this.annotationService.beginAnnotationRepair(sourcePath, id),
           focusAnnotation: (sourcePath, id) =>
             this.focusAnnotation(sourcePath, id),
           removeAnnotation: (annotation) => this.annotationService.remove(annotation),

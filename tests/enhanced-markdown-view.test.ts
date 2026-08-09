@@ -55,6 +55,7 @@ function harness(
     registerView: vi.fn((_adapter: {
       sourcePath: string;
       focusAnnotation(id: string): Promise<boolean>;
+      beginAnnotationRepair?(id: string): Promise<boolean> | boolean;
     }) => () => undefined),
     remove: vi.fn(async (annotation: HtmlAnnotation) => {
       currentAnnotations = currentAnnotations.filter((item) => item.id !== annotation.id);
@@ -400,5 +401,26 @@ describe("EnhancedMarkdownView", () => {
     expect(annotationService.registerView).toHaveBeenCalled();
     const adapter = annotationService.registerView.mock.calls.at(-1)?.[0];
     await expect(adapter?.focusAnnotation(existing.id)).resolves.toBe(true);
+  });
+
+  it("starts repair mode for an unresolved annotation", async () => {
+    const existing: HtmlAnnotation = {
+      color: "green",
+      comment: "important note",
+      id: "11111111111111111111111111111111",
+      quote: "Missing quote",
+      sourcePath: "notes/example.md",
+      target: { end: 13, exact: "Missing quote", prefix: "", start: 0, suffix: "" }
+    };
+    const { annotationService, showNotice, view } = harness(
+      async () => "Replacement text",
+      undefined,
+      [existing]
+    );
+    await view.onLoadFile(file("notes/example.md"));
+    const adapter = annotationService.registerView.mock.calls.at(-1)?.[0];
+
+    expect(adapter?.beginAnnotationRepair?.(existing.id)).toBe(true);
+    expect(showNotice).toHaveBeenCalledWith("请选择新的文本来重新定位这条批注。");
   });
 });

@@ -12,6 +12,8 @@ export const ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-focus-result" as const;
 export const ANNOTATION_REANCHOR_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-reanchor" as const;
+export const ANNOTATION_REPAIR_MESSAGE_TYPE =
+  "obsidian-html-preview:annotation-repair" as const;
 export const ANNOTATION_SYNC_SAVE_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-sync-save" as const;
 export const ANNOTATION_SYNC_DELETE_MESSAGE_TYPE =
@@ -69,6 +71,7 @@ export function createAnnotationRuntimeScript(
     const focusType = ${JSON.stringify(ANNOTATION_FOCUS_MESSAGE_TYPE)};
     const focusResultType = ${JSON.stringify(ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE)};
     const reanchorType = ${JSON.stringify(ANNOTATION_REANCHOR_MESSAGE_TYPE)};
+    const repairType = ${JSON.stringify(ANNOTATION_REPAIR_MESSAGE_TYPE)};
     const syncSaveType = ${JSON.stringify(ANNOTATION_SYNC_SAVE_MESSAGE_TYPE)};
     const syncDeleteType = ${JSON.stringify(ANNOTATION_SYNC_DELETE_MESSAGE_TYPE)};
     const colors = ["yellow", "green", "blue", "pink", "violet"];
@@ -78,6 +81,7 @@ export function createAnnotationRuntimeScript(
     let surface = null;
     let requestSequence = 0;
     let lastColor = "yellow";
+    let pendingRepairId = null;
 
     const style = document.createElement("style");
     style.dataset.htmlPreviewAnnotations = "true";
@@ -352,19 +356,25 @@ export function createAnnotationRuntimeScript(
       window.parent.postMessage(Object.assign({ renderId, requestId, type }, payload), "*");
     };
 
-    const showEditor = (draft, anchor, existing) => {
+    const showEditor = (draft, anchor, existing, repairing = false) => {
       const editor = document.createElement("div");
       editor.className = "annotation-editor";
       editor.setAttribute("role", "dialog");
-      editor.setAttribute("aria-label", existing ? "编辑注释" : "添加注释");
+      editor.setAttribute("aria-label", repairing ? "重新定位批注" : (existing ? "编辑注释" : "添加注释"));
       const header = document.createElement("div");
       header.className = "annotation-editor-header";
       const title = document.createElement("strong");
-      title.textContent = existing ? "编辑注释" : "添加注释";
+      title.textContent = repairing ? "重新定位批注" : (existing ? "编辑注释" : "添加注释");
       const close = button("×", "annotation-editor-close");
       close.setAttribute("aria-label", "关闭");
       close.addEventListener("click", closeSurface);
       header.append(title, close);
+      if (repairing) {
+        const hint = document.createElement("p");
+        hint.className = "annotation-editor-repair-hint";
+        hint.textContent = "已替换摘录位置，保存后将更新这条批注。";
+        header.append(hint);
+      }
       const quote = document.createElement("blockquote");
       quote.className = "annotation-editor-quote";
       quote.textContent = "“" + draft.quote + "”";
@@ -432,6 +442,17 @@ export function createAnnotationRuntimeScript(
     };
 
     const showToolbar = (captured) => {
+      const repairing = pendingRepairId
+        ? annotationById.get(pendingRepairId)
+        : null;
+      if (repairing) {
+        showEditor(Object.assign({}, repairing, captured.draft, {
+          color: repairing.color || "yellow",
+          comment: repairing.comment,
+          id: repairing.id
+        }), captured.anchor, repairing, true);
+        return;
+      }
       const toolbar = document.createElement("div");
       toolbar.className = "annotation-selection-toolbar";
       toolbar.setAttribute("role", "toolbar");
@@ -479,7 +500,10 @@ export function createAnnotationRuntimeScript(
         pending.delete(data.requestId);
         if (!data.ok) return;
         if (operation.kind === "delete") removeAnnotation(operation.annotation.id);
-        if (operation.kind === "save" && data.annotation) applyAnnotation(data.annotation);
+        if (operation.kind === "save" && data.annotation) {
+          applyAnnotation(data.annotation);
+          if (data.annotation.id === pendingRepairId) pendingRepairId = null;
+        }
         closeSurface();
         window.getSelection()?.removeAllRanges();
         return;
@@ -490,6 +514,12 @@ export function createAnnotationRuntimeScript(
       }
       if (data.type === syncDeleteType && typeof data.annotationId === "string") {
         removeAnnotation(data.annotationId);
+        return;
+      }
+      if (data.type === repairType && typeof data.annotationId === "string") {
+        pendingRepairId = annotationById.has(data.annotationId) ? data.annotationId : null;
+        closeSurface();
+        window.getSelection()?.removeAllRanges();
         return;
       }
       if (data.type !== focusType || typeof data.annotationId !== "string") return;

@@ -3,6 +3,7 @@ import type { HtmlAnnotation } from "./types";
 
 export interface AnnotationViewAdapter {
   readonly sourcePath: string;
+  beginAnnotationRepair?(id: string): Promise<boolean> | boolean;
   focusAnnotation(id: string): Promise<boolean>;
   removeAnnotation?(id: string): Promise<void> | void;
   saveAnnotation?(annotation: HtmlAnnotation): Promise<void> | void;
@@ -59,6 +60,16 @@ export class AnnotationService {
       .reverse();
     for (const view of candidates) {
       if (await view.focusAnnotation(id)) return true;
+    }
+    return false;
+  }
+
+  async beginAnnotationRepair(sourcePath: string, id: string): Promise<boolean> {
+    const candidates = [...this.views]
+      .filter((view) => view.sourcePath === sourcePath)
+      .reverse();
+    for (const view of candidates) {
+      if (await view.beginAnnotationRepair?.(id)) return true;
     }
     return false;
   }

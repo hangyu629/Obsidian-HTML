@@ -69,6 +69,27 @@ describe("AnnotationService", () => {
     expect(older).toHaveBeenCalledWith(annotation().id);
   });
 
+  it("routes annotation repair to the newest matching rendered view", async () => {
+    const { service } = harness();
+    const older = vi.fn(async () => false);
+    const newer = vi.fn(async () => true);
+    service.registerView({
+      sourcePath: "notes/a.md",
+      focusAnnotation: vi.fn(async () => false),
+      beginAnnotationRepair: older
+    });
+    service.registerView({
+      sourcePath: "notes/a.md",
+      focusAnnotation: vi.fn(async () => false),
+      beginAnnotationRepair: newer
+    });
+
+    await expect(service.beginAnnotationRepair("notes/a.md", annotation().id))
+      .resolves.toBe(true);
+    expect(newer).toHaveBeenCalledWith(annotation().id);
+    expect(older).not.toHaveBeenCalled();
+  });
+
   it("pushes save and delete updates directly into matching rendered views", async () => {
     const { service } = harness();
     const current = annotation();

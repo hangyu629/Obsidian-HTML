@@ -106,6 +106,7 @@ describe("HtmlPreviewView annotations", () => {
     expect(srcdoc).toContain("user-select: text !important");
     expect(srcdoc).toContain("annotation-selection-toolbar");
     expect(srcdoc).toContain("annotation-editor");
+    expect(srcdoc).toContain("annotation-repair");
   });
 
   it("persists a validated save message and responds to the iframe", async () => {

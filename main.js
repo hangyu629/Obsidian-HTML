@@ -185,6 +185,13 @@ var AnnotationService = class {
     }
     return false;
   }
+  async beginAnnotationRepair(sourcePath, id) {
+    const candidates = [...this.views].filter((view) => view.sourcePath === sourcePath).reverse();
+    for (const view of candidates) {
+      if (await view.beginAnnotationRepair?.(id)) return true;
+    }
+    return false;
+  }
   emit(sourcePath) {
     for (const listener of this.listeners.get(sourcePath) ?? []) listener();
   }
@@ -591,6 +598,28 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
         onSave: (updated) => this.environment.saveAnnotation(sourcePath, updated)
       }).open();
     });
+    const repair = document.createElement("button");
+    repair.type = "button";
+    repair.className = "clickable-icon annotation-sidebar-action annotation-sidebar-repair";
+    repair.dataset.annotationAction = "repair";
+    repair.setAttribute("aria-label", "Repair annotation");
+    repair.title = "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8";
+    (0, import_obsidian2.setIcon)(repair, "locate-fixed");
+    repair.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!sourcePath) return;
+      repair.disabled = true;
+      void this.environment.repairAnnotation(sourcePath, annotation.id).then((started) => {
+        if (!started) this.environment.showNotice("\u5F53\u524D\u89C6\u56FE\u65E0\u6CD5\u5F00\u59CB\u91CD\u65B0\u5B9A\u4F4D\u3002\u8BF7\u5148\u6253\u5F00\u539F\u6587\u9884\u89C8\u3002 ");
+      }).catch((error) => {
+        this.environment.showNotice(
+          error instanceof Error ? error.message : String(error)
+        );
+      }).finally(() => {
+        repair.disabled = false;
+      });
+    });
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "clickable-icon annotation-sidebar-action";
@@ -609,7 +638,7 @@ var AnnotationSidebarView = class extends import_obsidian2.ItemView {
         );
       });
     });
-    actions.append(edit, remove);
+    actions.append(edit, repair, remove);
     entry.append(item, actions);
     return entry;
   }
@@ -975,6 +1004,7 @@ var ANNOTATION_RESULT_MESSAGE_TYPE = "obsidian-html-preview:annotation-result";
 var ANNOTATION_FOCUS_MESSAGE_TYPE = "obsidian-html-preview:annotation-focus";
 var ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE = "obsidian-html-preview:annotation-focus-result";
 var ANNOTATION_REANCHOR_MESSAGE_TYPE = "obsidian-html-preview:annotation-reanchor";
+var ANNOTATION_REPAIR_MESSAGE_TYPE = "obsidian-html-preview:annotation-repair";
 var ANNOTATION_SYNC_SAVE_MESSAGE_TYPE = "obsidian-html-preview:annotation-sync-save";
 var ANNOTATION_SYNC_DELETE_MESSAGE_TYPE = "obsidian-html-preview:annotation-sync-delete";
 function createAnnotationRuntimeScript(renderId, annotations = []) {
@@ -1025,6 +1055,7 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
     const focusType = ${JSON.stringify(ANNOTATION_FOCUS_MESSAGE_TYPE)};
     const focusResultType = ${JSON.stringify(ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE)};
     const reanchorType = ${JSON.stringify(ANNOTATION_REANCHOR_MESSAGE_TYPE)};
+    const repairType = ${JSON.stringify(ANNOTATION_REPAIR_MESSAGE_TYPE)};
     const syncSaveType = ${JSON.stringify(ANNOTATION_SYNC_SAVE_MESSAGE_TYPE)};
     const syncDeleteType = ${JSON.stringify(ANNOTATION_SYNC_DELETE_MESSAGE_TYPE)};
     const colors = ["yellow", "green", "blue", "pink", "violet"];
@@ -1034,6 +1065,7 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
     let surface = null;
     let requestSequence = 0;
     let lastColor = "yellow";
+    let pendingRepairId = null;
 
     const style = document.createElement("style");
     style.dataset.htmlPreviewAnnotations = "true";
@@ -1308,19 +1340,25 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       window.parent.postMessage(Object.assign({ renderId, requestId, type }, payload), "*");
     };
 
-    const showEditor = (draft, anchor, existing) => {
+    const showEditor = (draft, anchor, existing, repairing = false) => {
       const editor = document.createElement("div");
       editor.className = "annotation-editor";
       editor.setAttribute("role", "dialog");
-      editor.setAttribute("aria-label", existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA");
+      editor.setAttribute("aria-label", repairing ? "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8" : (existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA"));
       const header = document.createElement("div");
       header.className = "annotation-editor-header";
       const title = document.createElement("strong");
-      title.textContent = existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA";
+      title.textContent = repairing ? "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8" : (existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA");
       const close = button("\xD7", "annotation-editor-close");
       close.setAttribute("aria-label", "\u5173\u95ED");
       close.addEventListener("click", closeSurface);
       header.append(title, close);
+      if (repairing) {
+        const hint = document.createElement("p");
+        hint.className = "annotation-editor-repair-hint";
+        hint.textContent = "\u5DF2\u66FF\u6362\u6458\u5F55\u4F4D\u7F6E\uFF0C\u4FDD\u5B58\u540E\u5C06\u66F4\u65B0\u8FD9\u6761\u6279\u6CE8\u3002";
+        header.append(hint);
+      }
       const quote = document.createElement("blockquote");
       quote.className = "annotation-editor-quote";
       quote.textContent = "\u201C" + draft.quote + "\u201D";
@@ -1388,6 +1426,17 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
     };
 
     const showToolbar = (captured) => {
+      const repairing = pendingRepairId
+        ? annotationById.get(pendingRepairId)
+        : null;
+      if (repairing) {
+        showEditor(Object.assign({}, repairing, captured.draft, {
+          color: repairing.color || "yellow",
+          comment: repairing.comment,
+          id: repairing.id
+        }), captured.anchor, repairing, true);
+        return;
+      }
       const toolbar = document.createElement("div");
       toolbar.className = "annotation-selection-toolbar";
       toolbar.setAttribute("role", "toolbar");
@@ -1435,7 +1484,10 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
         pending.delete(data.requestId);
         if (!data.ok) return;
         if (operation.kind === "delete") removeAnnotation(operation.annotation.id);
-        if (operation.kind === "save" && data.annotation) applyAnnotation(data.annotation);
+        if (operation.kind === "save" && data.annotation) {
+          applyAnnotation(data.annotation);
+          if (data.annotation.id === pendingRepairId) pendingRepairId = null;
+        }
         closeSurface();
         window.getSelection()?.removeAllRanges();
         return;
@@ -1446,6 +1498,12 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
       }
       if (data.type === syncDeleteType && typeof data.annotationId === "string") {
         removeAnnotation(data.annotationId);
+        return;
+      }
+      if (data.type === repairType && typeof data.annotationId === "string") {
+        pendingRepairId = annotationById.has(data.annotationId) ? data.annotationId : null;
+        closeSurface();
+        window.getSelection()?.removeAllRanges();
         return;
       }
       if (data.type !== focusType || typeof data.annotationId !== "string") return;
@@ -2345,6 +2403,7 @@ var HtmlPreviewView = class extends import_obsidian5.FileView {
       }
     );
     this.annotationViewRegistration = this.environment.annotationService.registerView({
+      beginAnnotationRepair: (id) => this.beginAnnotationRepair(id),
       removeAnnotation: (id) => this.syncRemovedAnnotation(id),
       saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
       sourcePath,
@@ -2634,6 +2693,21 @@ var HtmlPreviewView = class extends import_obsidian5.FileView {
         "*"
       );
     });
+  }
+  beginAnnotationRepair(id) {
+    if (!this.environment.getSettings().allowScripts || !this.frame?.contentWindow || !this.activeRenderId || !this.activeAnnotations.some((annotation) => annotation.id === id)) {
+      return false;
+    }
+    this.frame.contentWindow.postMessage(
+      {
+        annotationId: id,
+        renderId: this.activeRenderId,
+        type: ANNOTATION_REPAIR_MESSAGE_TYPE
+      },
+      "*"
+    );
+    this.environment.showNotice("\u8BF7\u9009\u62E9\u65B0\u7684\u6587\u672C\u6765\u91CD\u65B0\u5B9A\u4F4D\u8FD9\u6761\u6279\u6CE8\u3002");
+    return true;
   }
   resolvePendingFocus(found) {
     for (const pending of this.pendingFocus.values()) {
@@ -3094,8 +3168,19 @@ var AnnotationContextualUi = class {
   host;
   callbacks;
   surface = null;
-  showSelection(selection, anchor) {
+  showSelection(selection, anchor, existing) {
     this.close();
+    const initial = {
+      color: existing ? annotationDisplayColor(existing) : "yellow",
+      comment: existing?.comment ?? "",
+      ...existing?.id ? { id: existing.id } : {},
+      quote: selection.quote,
+      target: selection.target
+    };
+    if (existing) {
+      this.showEditor(initial, anchor, existing, true);
+      return;
+    }
     const toolbar = this.createSurface("div", "annotation-selection-toolbar");
     toolbar.setAttribute("role", "toolbar");
     toolbar.setAttribute("aria-label", "\u9009\u4E2D\u6587\u5B57\u64CD\u4F5C");
@@ -3103,18 +3188,17 @@ var AnnotationContextualUi = class {
     const color = this.button("\u989C\u8272", "annotation-toolbar-button");
     const comment = this.button("\u6CE8\u91CA", "annotation-toolbar-button");
     color.addEventListener("click", () => {
-      const existing = toolbar.querySelector(".annotation-toolbar-palette");
-      if (existing) {
-        existing.remove();
+      const existing2 = toolbar.querySelector(".annotation-toolbar-palette");
+      if (existing2) {
+        existing2.remove();
         return;
       }
-      const palette = this.createPalette(lastUsedColor, async (selected) => {
+      const palette = this.createPalette(existing2 ? initial.color : lastUsedColor, async (selected) => {
         lastUsedColor = selected;
         const saved = await this.save({
+          ...initial,
           color: selected,
-          comment: "",
-          quote: selection.quote,
-          target: selection.target
+          comment: initial.comment
         });
         if (saved) this.close();
       });
@@ -3125,12 +3209,11 @@ var AnnotationContextualUi = class {
     comment.addEventListener("click", () => {
       this.showEditor(
         {
-          color: "yellow",
-          comment: "",
-          quote: selection.quote,
-          target: selection.target
+          ...initial,
+          color: existing ? initial.color : "yellow"
         },
-        anchor
+        anchor,
+        existing
       );
     });
     toolbar.append(color, comment);
@@ -3156,20 +3239,26 @@ var AnnotationContextualUi = class {
   destroy() {
     this.close();
   }
-  showEditor(initial, anchor, existing) {
+  showEditor(initial, anchor, existing, repairing = false) {
     this.close();
     const draft = { ...initial };
     const editor = this.createSurface("div", "annotation-editor");
     editor.setAttribute("role", "dialog");
-    editor.setAttribute("aria-label", existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA");
+    editor.setAttribute("aria-label", repairing ? "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8" : existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA");
     const header = document.createElement("div");
     header.className = "annotation-editor-header";
     const title = document.createElement("strong");
-    title.textContent = existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA";
+    title.textContent = repairing ? "\u91CD\u65B0\u5B9A\u4F4D\u6279\u6CE8" : existing ? "\u7F16\u8F91\u6CE8\u91CA" : "\u6DFB\u52A0\u6CE8\u91CA";
     const close = this.button("\xD7", "annotation-editor-close");
     close.setAttribute("aria-label", "\u5173\u95ED");
     close.addEventListener("click", () => this.close());
     header.append(title, close);
+    if (repairing) {
+      const hint = document.createElement("p");
+      hint.className = "annotation-editor-repair-hint";
+      hint.textContent = "\u5DF2\u66FF\u6362\u6458\u5F55\u4F4D\u7F6E\uFF0C\u4FDD\u5B58\u540E\u5C06\u66F4\u65B0\u8FD9\u6761\u6279\u6CE8\u3002";
+      header.append(hint);
+    }
     const quote = document.createElement("blockquote");
     quote.className = "annotation-editor-quote";
     quote.textContent = `\u201C${initial.quote}\u201D`;
@@ -4341,6 +4430,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
   sessionMode = "manual";
   sessionSelection = null;
   returnMode = "preview";
+  pendingRepairId = null;
   getViewType() {
     return ENHANCED_MARKDOWN_VIEW_TYPE;
   }
@@ -4418,6 +4508,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     this.annotationViewRegistration?.();
     this.annotationViewRegistration = null;
     this.activeAnnotations = [];
+    this.pendingRepairId = null;
     this.annotationUi?.close();
     this.renderComponent?.unload();
     this.renderComponent = null;
@@ -4449,6 +4540,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     this.annotationViewRegistration?.();
     this.annotationViewRegistration = null;
     this.activeAnnotations = [];
+    this.pendingRepairId = null;
     this.annotationUi?.destroy();
     this.annotationUi = null;
     this.renderComponent?.unload();
@@ -4481,6 +4573,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     this.annotationViewRegistration = this.environment.annotationService.registerView({
       removeAnnotation: (id) => this.syncRemovedAnnotation(id),
       saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
+      beginAnnotationRepair: (id) => this.beginAnnotationRepair(id),
       sourcePath,
       focusAnnotation: (id) => Promise.resolve(this.focusAnnotation(id))
     });
@@ -4528,7 +4621,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
       }
       this.renderComponent?.unload();
       this.renderComponent = component;
-      this.activeAnnotations = resolvedAnnotations;
+      this.activeAnnotations = [...annotations];
       this.contentEl.replaceChildren(root);
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
       await this.persistRecoveredTargets(file.path, annotations, resolvedAnnotations);
@@ -4567,6 +4660,15 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     const content = this.contentRoot();
     return content ? focusAnnotationMark(content, id) : false;
   }
+  beginAnnotationRepair(id) {
+    if (!this.file || !this.contentRoot() || !this.activeAnnotations.some((annotation) => annotation.id === id)) {
+      return false;
+    }
+    this.pendingRepairId = id;
+    this.annotationUi?.close();
+    this.environment.showNotice("\u8BF7\u9009\u62E9\u65B0\u7684\u6587\u672C\u6765\u91CD\u65B0\u5B9A\u4F4D\u8FD9\u6761\u6279\u6CE8\u3002");
+    return true;
+  }
   syncSavedAnnotation(annotation) {
     this.suppressAnnotationRenders += 1;
     this.activeAnnotations = [
@@ -4584,7 +4686,12 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     const content = this.contentRoot();
     if (!content) return;
     clearAnnotationHighlights(content);
-    this.activeAnnotations = applyAnnotationHighlights(content, this.activeAnnotations);
+    const resolved = applyAnnotationHighlights(content, this.activeAnnotations);
+    const targets = new Map(resolved.map((annotation) => [annotation.id, annotation.target]));
+    this.activeAnnotations = this.activeAnnotations.map((annotation) => {
+      const target = targets.get(annotation.id);
+      return target ? { ...annotation, target } : annotation;
+    });
   }
   showSelectionUi() {
     const selection = this.captureCurrentSelection();
@@ -4592,7 +4699,8 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
     if (!selection || !nativeSelection || nativeSelection.rangeCount === 0) return;
     const range = nativeSelection.getRangeAt(0);
     const anchor = typeof range.getBoundingClientRect === "function" ? range.getBoundingClientRect() : new DOMRect();
-    this.annotationUi?.showSelection(selection, anchor);
+    const repair = this.pendingRepairId ? this.activeAnnotations.find((annotation) => annotation.id === this.pendingRepairId) : void 0;
+    this.annotationUi?.showSelection(selection, anchor, repair);
   }
   openExistingAnnotation(event) {
     const content = this.contentRoot();
@@ -4615,6 +4723,7 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
         id: draft.id ?? this.environment.createAnnotationId?.() ?? createRenderId(),
         sourcePath
       });
+      if (draft.id && draft.id === this.pendingRepairId) this.pendingRepairId = null;
       window.getSelection()?.removeAllRanges();
       this.environment.showNotice(draft.id ? "Annotation updated." : "Annotation added.");
       return true;
@@ -4856,6 +4965,7 @@ var HtmlPreviewPlugin = class extends import_obsidian10.Plugin {
       (leaf) => new AnnotationSidebarView(leaf, {
         annotationService: this.annotationService,
         exportAnnotations: (sourcePath, annotations) => this.exportAnnotations(sourcePath, annotations),
+        repairAnnotation: (sourcePath, id) => this.annotationService.beginAnnotationRepair(sourcePath, id),
         focusAnnotation: (sourcePath, id) => this.focusAnnotation(sourcePath, id),
         removeAnnotation: (annotation) => this.annotationService.remove(annotation),
         saveAnnotation: (sourcePath, annotation) => this.annotationService.save(sourcePath, annotation),

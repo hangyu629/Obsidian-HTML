@@ -130,6 +130,36 @@ describe("AnnotationContextualUi", () => {
     expect(onDelete).toHaveBeenCalledWith(existing);
   });
 
+  it("preserves annotation metadata while repairing a selected target", async () => {
+    const { host, onSave, ui } = harness();
+    const existing = annotation();
+    const repairedTarget = {
+      end: 19,
+      exact: "Replacement text",
+      prefix: "Before ",
+      start: 3,
+      suffix: " after"
+    };
+    ui.showSelection(
+      { quote: repairedTarget.exact, target: repairedTarget },
+      new DOMRect(80, 40, 120, 20),
+      existing
+    );
+    const textarea = host.querySelector<HTMLTextAreaElement>("textarea")!;
+    expect(textarea.value).toBe(existing.comment);
+    textarea.value = "Updated while repairing";
+    clickByText(host, "保存修改");
+    await Promise.resolve();
+
+    expect(onSave).toHaveBeenCalledWith({
+      color: existing.color,
+      comment: "Updated while repairing",
+      id: existing.id,
+      quote: repairedTarget.exact,
+      target: repairedTarget
+    });
+  });
+
   it("keeps the editor and comment when persistence fails", async () => {
     const onSave = vi.fn(async () => false);
     const { host, ui } = harness(onSave);

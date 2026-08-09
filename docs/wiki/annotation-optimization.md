@@ -20,6 +20,31 @@ Status legend:
 - [x] `done` Add annotation export to Markdown
 - [x] `done` Harden re-anchor heuristics for repeated quotes and larger text rewrites
 
+## Next Roadmap
+
+Items are ordered by user value and implementation dependency. Each item should be moved to `in_progress` before coding and to `done` only after automated verification and a local Vault build.
+
+- [x] `done` Repair annotations that can no longer be located after source rewrites
+  - Start repair from the sidebar and select a replacement passage in HTML Preview or Enhanced Markdown Reading.
+  - Preserve the existing annotation ID, color, and comment while replacing its quote target.
+  - Keep the original source files unchanged and persist only the annotation data update.
+- [ ] `pending` Search and filter annotations across the entire Vault
+  - Search quote text and comment text.
+  - Filter by file, folder, color, and comment status.
+  - Open the source file and focus the selected annotation.
+- [ ] `pending` Expand annotation workflow controls
+  - Add keyboard shortcuts, copy quote/comment actions, and batch color/export operations.
+  - Keep destructive batch actions explicit and recoverable.
+- [ ] `pending` Expand the template system
+  - Support custom template packages, preview thumbnails, reusable variables, and rule precedence inspection.
+- [ ] `pending` Improve HTML cleanup workflow
+  - Add before/after comparison, stronger candidate grouping, and a clear restore-original action.
+- [ ] `pending` Improve reading experience
+  - Persist scroll position, add print/PDF output, synchronized outline scrolling, image lightbox, and code-copy controls.
+- [ ] `pending` Reduce runtime drift and improve resilience
+  - Keep DOM and iframe annotation resolution logic generated from one source.
+  - Add annotation data migration, corruption recovery, and clearer script/resource security controls.
+
 ## Notes
 
 - Hidden Vault data stays under `.html-preview/` for backward compatibility.

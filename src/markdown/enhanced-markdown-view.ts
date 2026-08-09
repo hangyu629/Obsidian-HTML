@@ -65,6 +65,7 @@ export class EnhancedMarkdownView extends FileView {
   private sessionMode: TemplateResolutionMode = "manual";
   private sessionSelection: TemplateSelection | null = null;
   private returnMode: "source" | "preview" = "preview";
+  private pendingRepairId: string | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -159,6 +160,7 @@ export class EnhancedMarkdownView extends FileView {
     this.annotationViewRegistration?.();
     this.annotationViewRegistration = null;
     this.activeAnnotations = [];
+    this.pendingRepairId = null;
     this.annotationUi?.close();
     this.renderComponent?.unload();
     this.renderComponent = null;
@@ -193,6 +195,7 @@ export class EnhancedMarkdownView extends FileView {
     this.annotationViewRegistration?.();
     this.annotationViewRegistration = null;
     this.activeAnnotations = [];
+    this.pendingRepairId = null;
     this.annotationUi?.destroy();
     this.annotationUi = null;
     this.renderComponent?.unload();
@@ -226,6 +229,7 @@ export class EnhancedMarkdownView extends FileView {
     this.annotationViewRegistration = this.environment.annotationService.registerView({
       removeAnnotation: (id) => this.syncRemovedAnnotation(id),
       saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
+      beginAnnotationRepair: (id) => this.beginAnnotationRepair(id),
       sourcePath,
       focusAnnotation: (id) => Promise.resolve(this.focusAnnotation(id))
     });
@@ -281,7 +285,7 @@ export class EnhancedMarkdownView extends FileView {
       }
       this.renderComponent?.unload();
       this.renderComponent = component;
-      this.activeAnnotations = resolvedAnnotations;
+      this.activeAnnotations = [...annotations];
       this.contentEl.replaceChildren(root);
       this.environment.coordinator.update(this.viewId, file.path, result.dependencies);
       await this.persistRecoveredTargets(file.path, annotations, resolvedAnnotations);
@@ -337,6 +341,17 @@ export class EnhancedMarkdownView extends FileView {
     return content ? focusAnnotationMark(content, id) : false;
   }
 
+  beginAnnotationRepair(id: string): boolean {
+    if (!this.file || !this.contentRoot() ||
+      !this.activeAnnotations.some((annotation) => annotation.id === id)) {
+      return false;
+    }
+    this.pendingRepairId = id;
+    this.annotationUi?.close();
+    this.environment.showNotice("请选择新的文本来重新定位这条批注。");
+    return true;
+  }
+
   private syncSavedAnnotation(annotation: HtmlAnnotation): void {
     this.suppressAnnotationRenders += 1;
     this.activeAnnotations = [
@@ -356,7 +371,12 @@ export class EnhancedMarkdownView extends FileView {
     const content = this.contentRoot();
     if (!content) return;
     clearAnnotationHighlights(content);
-    this.activeAnnotations = applyAnnotationHighlights(content, this.activeAnnotations);
+    const resolved = applyAnnotationHighlights(content, this.activeAnnotations);
+    const targets = new Map(resolved.map((annotation) => [annotation.id, annotation.target]));
+    this.activeAnnotations = this.activeAnnotations.map((annotation) => {
+      const target = targets.get(annotation.id);
+      return target ? { ...annotation, target } : annotation;
+    });
   }
 
   private showSelectionUi(): void {
@@ -367,7 +387,10 @@ export class EnhancedMarkdownView extends FileView {
     const anchor = typeof range.getBoundingClientRect === "function"
       ? range.getBoundingClientRect()
       : new DOMRect();
-    this.annotationUi?.showSelection(selection, anchor);
+    const repair = this.pendingRepairId
+      ? this.activeAnnotations.find((annotation) => annotation.id === this.pendingRepairId)
+      : undefined;
+    this.annotationUi?.showSelection(selection, anchor, repair);
   }
 
   private openExistingAnnotation(event: MouseEvent): void {
@@ -395,6 +418,7 @@ export class EnhancedMarkdownView extends FileView {
         id: draft.id ?? this.environment.createAnnotationId?.() ?? createRenderId(),
         sourcePath
       });
+      if (draft.id && draft.id === this.pendingRepairId) this.pendingRepairId = null;
       window.getSelection()?.removeAllRanges();
       this.environment.showNotice(draft.id ? "Annotation updated." : "Annotation added.");
       return true;

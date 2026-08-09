@@ -6,6 +6,7 @@ import {
   ANNOTATION_FOCUS_MESSAGE_TYPE,
   ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE,
   ANNOTATION_REANCHOR_MESSAGE_TYPE,
+  ANNOTATION_REPAIR_MESSAGE_TYPE,
   ANNOTATION_RESULT_MESSAGE_TYPE,
   ANNOTATION_SAVE_MESSAGE_TYPE,
   ANNOTATION_SYNC_DELETE_MESSAGE_TYPE,
@@ -289,6 +290,7 @@ export class HtmlPreviewView extends FileView {
       }
     );
     this.annotationViewRegistration = this.environment.annotationService.registerView({
+      beginAnnotationRepair: (id) => this.beginAnnotationRepair(id),
       removeAnnotation: (id) => this.syncRemovedAnnotation(id),
       saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
       sourcePath,
@@ -627,6 +629,24 @@ export class HtmlPreviewView extends FileView {
         "*"
       );
     });
+  }
+
+  beginAnnotationRepair(id: string): boolean {
+    if (!this.environment.getSettings().allowScripts ||
+      !this.frame?.contentWindow || !this.activeRenderId ||
+      !this.activeAnnotations.some((annotation) => annotation.id === id)) {
+      return false;
+    }
+    this.frame.contentWindow.postMessage(
+      {
+        annotationId: id,
+        renderId: this.activeRenderId,
+        type: ANNOTATION_REPAIR_MESSAGE_TYPE
+      },
+      "*"
+    );
+    this.environment.showNotice("请选择新的文本来重新定位这条批注。");
+    return true;
   }
 
   private resolvePendingFocus(found: boolean): void {

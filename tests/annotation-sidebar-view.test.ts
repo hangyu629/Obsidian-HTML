@@ -63,6 +63,7 @@ function harness(focusResult = true) {
   };
   const showNotice = vi.fn();
   const exportAnnotations = vi.fn(async () => undefined);
+  const repairAnnotation = vi.fn(async () => true);
   const app = {};
   const leaf = Object.assign(Object.create(WorkspaceLeaf.prototype), { app });
   const view = new AnnotationSidebarView(leaf, {
@@ -71,11 +72,19 @@ function harness(focusResult = true) {
     removeAnnotation: (annotation) => annotationService.remove(annotation),
     saveAnnotation: (path, annotation) => annotationService.save(path, annotation),
     exportAnnotations,
+    repairAnnotation,
     showNotice
   });
   document.body.append(view.containerEl);
   view.onload();
-  return { annotationService, change: () => changeListener?.(), exportAnnotations, showNotice, view };
+  return {
+    annotationService,
+    change: () => changeListener?.(),
+    exportAnnotations,
+    repairAnnotation,
+    showNotice,
+    view
+  };
 }
 
 function clickByText(host: HTMLElement, text: string): void {
@@ -189,6 +198,24 @@ describe("AnnotationSidebarView", () => {
     expect(showNotice).toHaveBeenCalledWith(
       "无法定位这条注释，原文可能已经发生变化。"
     );
+  });
+
+  it("starts repair from an annotation action", async () => {
+    const { repairAnnotation, view } = harness();
+    await view.setSource("notes/a.md");
+
+    const repairButton = view.contentEl.querySelector<HTMLButtonElement>(
+      '[data-annotation-action="repair"]'
+    );
+    expect(repairButton).toBeDefined();
+    repairButton?.click();
+
+    await vi.waitFor(() => {
+      expect(repairAnnotation).toHaveBeenCalledWith(
+        "notes/a.md",
+        "11111111111111111111111111111111"
+      );
+    });
   });
 
   it("edits and deletes annotations from the sidebar without breaking focus navigation", async () => {
