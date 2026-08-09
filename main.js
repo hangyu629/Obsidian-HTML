@@ -154,10 +154,12 @@ var AnnotationService = class {
   }
   async save(sourcePath, annotation) {
     await this.store.saveFileAnnotation(sourcePath, annotation);
+    await this.syncViews(sourcePath, (view) => view.saveAnnotation?.(annotation));
     this.emit(sourcePath);
   }
   async remove(annotation) {
     await this.store.removeAnnotation(annotation);
+    await this.syncViews(annotation.sourcePath, (view) => view.removeAnnotation?.(annotation.id));
     this.emit(annotation.sourcePath);
   }
   subscribe(sourcePath, listener) {
@@ -185,6 +187,11 @@ var AnnotationService = class {
   }
   emit(sourcePath) {
     for (const listener of this.listeners.get(sourcePath) ?? []) listener();
+  }
+  async syncViews(sourcePath, callback) {
+    for (const view of [...this.views].filter((candidate) => candidate.sourcePath === sourcePath)) {
+      await callback(view);
+    }
   }
 };
 
@@ -849,6 +856,8 @@ var ANNOTATION_RESULT_MESSAGE_TYPE = "obsidian-html-preview:annotation-result";
 var ANNOTATION_FOCUS_MESSAGE_TYPE = "obsidian-html-preview:annotation-focus";
 var ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE = "obsidian-html-preview:annotation-focus-result";
 var ANNOTATION_REANCHOR_MESSAGE_TYPE = "obsidian-html-preview:annotation-reanchor";
+var ANNOTATION_SYNC_SAVE_MESSAGE_TYPE = "obsidian-html-preview:annotation-sync-save";
+var ANNOTATION_SYNC_DELETE_MESSAGE_TYPE = "obsidian-html-preview:annotation-sync-delete";
 function createAnnotationRuntimeScript(renderId, annotations = []) {
   const styleText = `
     body, body * { -webkit-user-select: text !important; user-select: text !important; }
@@ -897,6 +906,8 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
     const focusType = ${JSON.stringify(ANNOTATION_FOCUS_MESSAGE_TYPE)};
     const focusResultType = ${JSON.stringify(ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE)};
     const reanchorType = ${JSON.stringify(ANNOTATION_REANCHOR_MESSAGE_TYPE)};
+    const syncSaveType = ${JSON.stringify(ANNOTATION_SYNC_SAVE_MESSAGE_TYPE)};
+    const syncDeleteType = ${JSON.stringify(ANNOTATION_SYNC_DELETE_MESSAGE_TYPE)};
     const colors = ["yellow", "green", "blue", "pink", "violet"];
     const labels = { yellow: "\u9EC4\u8272", green: "\u7EFF\u8272", blue: "\u84DD\u8272", pink: "\u7C89\u8272", violet: "\u7D2B\u8272" };
     const annotationById = new Map();
@@ -1297,6 +1308,14 @@ function createAnnotationRuntimeScript(renderId, annotations = []) {
         if (operation.kind === "save" && data.annotation) applyAnnotation(data.annotation);
         closeSurface();
         window.getSelection()?.removeAllRanges();
+        return;
+      }
+      if (data.type === syncSaveType && data.annotation) {
+        applyAnnotation(data.annotation);
+        return;
+      }
+      if (data.type === syncDeleteType && typeof data.annotationId === "string") {
+        removeAnnotation(data.annotationId);
         return;
       }
       if (data.type !== focusType || typeof data.annotationId !== "string") return;
@@ -2196,6 +2215,8 @@ var HtmlPreviewView = class extends import_obsidian5.FileView {
       }
     );
     this.annotationViewRegistration = this.environment.annotationService.registerView({
+      removeAnnotation: (id) => this.syncRemovedAnnotation(id),
+      saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
       sourcePath,
       focusAnnotation: (id) => this.focusAnnotation(id)
     });
@@ -2434,6 +2455,35 @@ var HtmlPreviewView = class extends import_obsidian5.FileView {
         this.suppressAnnotationRenders -= 1;
       }
     }
+  }
+  syncSavedAnnotation(annotation) {
+    if (!this.frame?.contentWindow || !this.activeRenderId) return;
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = [
+      ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+      annotation
+    ];
+    this.frame.contentWindow.postMessage(
+      {
+        annotation,
+        renderId: this.activeRenderId,
+        type: ANNOTATION_SYNC_SAVE_MESSAGE_TYPE
+      },
+      "*"
+    );
+  }
+  syncRemovedAnnotation(id) {
+    if (!this.frame?.contentWindow || !this.activeRenderId) return;
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = this.activeAnnotations.filter((item) => item.id !== id);
+    this.frame.contentWindow.postMessage(
+      {
+        annotationId: id,
+        renderId: this.activeRenderId,
+        type: ANNOTATION_SYNC_DELETE_MESSAGE_TYPE
+      },
+      "*"
+    );
   }
   async focusAnnotation(id) {
     if (!this.environment.getSettings().allowScripts || !this.frame?.contentWindow || !this.activeRenderId) return false;
@@ -3305,6 +3355,12 @@ function applyAnnotationHighlights(root, annotations) {
     absoluteStart = absoluteEnd;
   }
   return resolvedAnnotations;
+}
+function clearAnnotationHighlights(root) {
+  for (const mark of root.querySelectorAll("mark[data-obsidian-html-preview-annotation]")) {
+    mark.replaceWith(...Array.from(mark.childNodes));
+  }
+  root.normalize();
 }
 function annotationFromMark(root, target) {
   if (!(target instanceof Node)) return null;
@@ -4284,6 +4340,8 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
       }
     );
     this.annotationViewRegistration = this.environment.annotationService.registerView({
+      removeAnnotation: (id) => this.syncRemovedAnnotation(id),
+      saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
       sourcePath,
       focusAnnotation: (id) => Promise.resolve(this.focusAnnotation(id))
     });
@@ -4369,6 +4427,25 @@ var EnhancedMarkdownView = class extends import_obsidian8.FileView {
   focusAnnotation(id) {
     const content = this.contentRoot();
     return content ? focusAnnotationMark(content, id) : false;
+  }
+  syncSavedAnnotation(annotation) {
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = [
+      ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+      annotation
+    ];
+    this.renderActiveAnnotations();
+  }
+  syncRemovedAnnotation(id) {
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = this.activeAnnotations.filter((item) => item.id !== id);
+    this.renderActiveAnnotations();
+  }
+  renderActiveAnnotations() {
+    const content = this.contentRoot();
+    if (!content) return;
+    clearAnnotationHighlights(content);
+    this.activeAnnotations = applyAnnotationHighlights(content, this.activeAnnotations);
   }
   showSelectionUi() {
     const selection = this.captureCurrentSelection();

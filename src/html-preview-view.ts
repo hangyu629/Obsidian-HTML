@@ -7,7 +7,9 @@ import {
   ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE,
   ANNOTATION_REANCHOR_MESSAGE_TYPE,
   ANNOTATION_RESULT_MESSAGE_TYPE,
-  ANNOTATION_SAVE_MESSAGE_TYPE
+  ANNOTATION_SAVE_MESSAGE_TYPE,
+  ANNOTATION_SYNC_DELETE_MESSAGE_TYPE,
+  ANNOTATION_SYNC_SAVE_MESSAGE_TYPE
 } from "./annotations/runtime";
 import {
   annotationColor,
@@ -287,6 +289,8 @@ export class HtmlPreviewView extends FileView {
       }
     );
     this.annotationViewRegistration = this.environment.annotationService.registerView({
+      removeAnnotation: (id) => this.syncRemovedAnnotation(id),
+      saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
       sourcePath,
       focusAnnotation: (id) => this.focusAnnotation(id)
     });
@@ -570,6 +574,37 @@ export class HtmlPreviewView extends FileView {
         this.suppressAnnotationRenders -= 1;
       }
     }
+  }
+
+  private syncSavedAnnotation(annotation: HtmlAnnotation): void {
+    if (!this.frame?.contentWindow || !this.activeRenderId) return;
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = [
+      ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+      annotation
+    ];
+    this.frame.contentWindow.postMessage(
+      {
+        annotation,
+        renderId: this.activeRenderId,
+        type: ANNOTATION_SYNC_SAVE_MESSAGE_TYPE
+      },
+      "*"
+    );
+  }
+
+  private syncRemovedAnnotation(id: string): void {
+    if (!this.frame?.contentWindow || !this.activeRenderId) return;
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = this.activeAnnotations.filter((item) => item.id !== id);
+    this.frame.contentWindow.postMessage(
+      {
+        annotationId: id,
+        renderId: this.activeRenderId,
+        type: ANNOTATION_SYNC_DELETE_MESSAGE_TYPE
+      },
+      "*"
+    );
   }
 
   async focusAnnotation(id: string): Promise<boolean> {

@@ -9,6 +9,7 @@ import {
   annotationFromMark,
   applyAnnotationHighlights,
   captureAnnotationSelection,
+  clearAnnotationHighlights,
   focusAnnotationMark,
   type AnnotationSelection
 } from "../annotations/dom";
@@ -223,6 +224,8 @@ export class EnhancedMarkdownView extends FileView {
       }
     );
     this.annotationViewRegistration = this.environment.annotationService.registerView({
+      removeAnnotation: (id) => this.syncRemovedAnnotation(id),
+      saveAnnotation: (annotation) => this.syncSavedAnnotation(annotation),
       sourcePath,
       focusAnnotation: (id) => Promise.resolve(this.focusAnnotation(id))
     });
@@ -332,6 +335,28 @@ export class EnhancedMarkdownView extends FileView {
   focusAnnotation(id: string): boolean {
     const content = this.contentRoot();
     return content ? focusAnnotationMark(content, id) : false;
+  }
+
+  private syncSavedAnnotation(annotation: HtmlAnnotation): void {
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = [
+      ...this.activeAnnotations.filter((item) => item.id !== annotation.id),
+      annotation
+    ];
+    this.renderActiveAnnotations();
+  }
+
+  private syncRemovedAnnotation(id: string): void {
+    this.suppressAnnotationRenders += 1;
+    this.activeAnnotations = this.activeAnnotations.filter((item) => item.id !== id);
+    this.renderActiveAnnotations();
+  }
+
+  private renderActiveAnnotations(): void {
+    const content = this.contentRoot();
+    if (!content) return;
+    clearAnnotationHighlights(content);
+    this.activeAnnotations = applyAnnotationHighlights(content, this.activeAnnotations);
   }
 
   private showSelectionUi(): void {

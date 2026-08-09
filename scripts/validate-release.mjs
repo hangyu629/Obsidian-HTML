@@ -7,8 +7,8 @@ const versions = JSON.parse(await readFile("versions.json", "utf8"));
 
 const failures = [];
 
-if (manifest.id !== "html-preview") {
-  failures.push("manifest.id must be html-preview");
+if (manifest.id !== "obsidian-html") {
+  failures.push("manifest.id must be obsidian-html");
 }
 if (manifest.version !== packageJson.version) {
   failures.push("manifest.version must match package.json version");
@@ -38,4 +38,3 @@ if (failures.length > 0) {
     `Validated HTML Preview ${manifest.version}: ${requiredArtifacts.join(", ")}`
   );
 }
-

@@ -38,6 +38,8 @@ function harness(
   })),
   initialAnnotations: readonly HtmlAnnotation[] = []
 ) {
+  let currentAnnotations = [...initialAnnotations];
+  const listeners = new Set<() => void>();
   const app = {
     vault: {
       cachedRead: read,
@@ -49,14 +51,20 @@ function harness(
   const coordinator = new PreviewCoordinator(0);
   const annotationService = {
     focus: vi.fn(async () => false),
-    load: vi.fn(async () => [...initialAnnotations]),
+    load: vi.fn(async () => [...currentAnnotations]),
     registerView: vi.fn((_adapter: {
       sourcePath: string;
       focusAnnotation(id: string): Promise<boolean>;
     }) => () => undefined),
-    remove: vi.fn(async () => undefined),
+    remove: vi.fn(async (annotation: HtmlAnnotation) => {
+      currentAnnotations = currentAnnotations.filter((item) => item.id !== annotation.id);
+      for (const listener of listeners) listener();
+    }),
     save: vi.fn(async () => undefined),
-    subscribe: vi.fn(() => () => undefined)
+    subscribe: vi.fn((_sourcePath: string, listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    })
   };
   const showNotice = vi.fn();
   const onReturnToMarkdown = vi.fn();
@@ -179,6 +187,31 @@ describe("EnhancedMarkdownView", () => {
           target: expect.objectContaining({ start: 6, end: 16, prefix: "Intro " })
         })
       );
+    });
+  });
+
+  it("refreshes rendered Markdown after an external annotation deletion", async () => {
+    const existing: HtmlAnnotation = {
+      color: "yellow",
+      comment: "important note",
+      id: "11111111111111111111111111111111",
+      quote: "Alpha beta",
+      sourcePath: "notes/example.md",
+      target: { end: 10, exact: "Alpha beta", prefix: "", start: 0, suffix: " gamma" }
+    };
+    const { annotationService, view } = harness(
+      async () => "Alpha beta gamma",
+      vi.fn(() => ({ source: "default" as const, templateId: "book-editorial", themeId: "light" })),
+      [existing]
+    );
+
+    await view.onLoadFile(file("notes/example.md"));
+    expect(view.contentEl.querySelector("mark")?.textContent).toBe("Alpha beta");
+
+    await annotationService.remove(existing);
+
+    await vi.waitFor(() => {
+      expect(view.contentEl.querySelector("mark")).toBeNull();
     });
   });
 

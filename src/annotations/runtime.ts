@@ -12,6 +12,10 @@ export const ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-focus-result" as const;
 export const ANNOTATION_REANCHOR_MESSAGE_TYPE =
   "obsidian-html-preview:annotation-reanchor" as const;
+export const ANNOTATION_SYNC_SAVE_MESSAGE_TYPE =
+  "obsidian-html-preview:annotation-sync-save" as const;
+export const ANNOTATION_SYNC_DELETE_MESSAGE_TYPE =
+  "obsidian-html-preview:annotation-sync-delete" as const;
 
 export function createAnnotationRuntimeScript(
   renderId: string,
@@ -65,6 +69,8 @@ export function createAnnotationRuntimeScript(
     const focusType = ${JSON.stringify(ANNOTATION_FOCUS_MESSAGE_TYPE)};
     const focusResultType = ${JSON.stringify(ANNOTATION_FOCUS_RESULT_MESSAGE_TYPE)};
     const reanchorType = ${JSON.stringify(ANNOTATION_REANCHOR_MESSAGE_TYPE)};
+    const syncSaveType = ${JSON.stringify(ANNOTATION_SYNC_SAVE_MESSAGE_TYPE)};
+    const syncDeleteType = ${JSON.stringify(ANNOTATION_SYNC_DELETE_MESSAGE_TYPE)};
     const colors = ["yellow", "green", "blue", "pink", "violet"];
     const labels = { yellow: "黄色", green: "绿色", blue: "蓝色", pink: "粉色", violet: "紫色" };
     const annotationById = new Map();
@@ -465,6 +471,14 @@ export function createAnnotationRuntimeScript(
         if (operation.kind === "save" && data.annotation) applyAnnotation(data.annotation);
         closeSurface();
         window.getSelection()?.removeAllRanges();
+        return;
+      }
+      if (data.type === syncSaveType && data.annotation) {
+        applyAnnotation(data.annotation);
+        return;
+      }
+      if (data.type === syncDeleteType && typeof data.annotationId === "string") {
+        removeAnnotation(data.annotationId);
         return;
       }
       if (data.type !== focusType || typeof data.annotationId !== "string") return;

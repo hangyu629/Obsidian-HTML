@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-html-preview",
+  "name": "obsidian-html",
   "version": "0.3.0",
   "description": "Preview and non-destructively clean up HTML files in Obsidian.",
   "private": true,

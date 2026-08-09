@@ -4,6 +4,8 @@ import type { HtmlAnnotation } from "./types";
 export interface AnnotationViewAdapter {
   readonly sourcePath: string;
   focusAnnotation(id: string): Promise<boolean>;
+  removeAnnotation?(id: string): Promise<void> | void;
+  saveAnnotation?(annotation: HtmlAnnotation): Promise<void> | void;
 }
 
 type AnnotationPersistence = Pick<
@@ -23,11 +25,13 @@ export class AnnotationService {
 
   async save(sourcePath: string, annotation: HtmlAnnotation): Promise<void> {
     await this.store.saveFileAnnotation(sourcePath, annotation);
+    await this.syncViews(sourcePath, (view) => view.saveAnnotation?.(annotation));
     this.emit(sourcePath);
   }
 
   async remove(annotation: HtmlAnnotation): Promise<void> {
     await this.store.removeAnnotation(annotation);
+    await this.syncViews(annotation.sourcePath, (view) => view.removeAnnotation?.(annotation.id));
     this.emit(annotation.sourcePath);
   }
 
@@ -61,5 +65,14 @@ export class AnnotationService {
 
   private emit(sourcePath: string): void {
     for (const listener of this.listeners.get(sourcePath) ?? []) listener();
+  }
+
+  private async syncViews(
+    sourcePath: string,
+    callback: (view: AnnotationViewAdapter) => Promise<void> | void
+  ): Promise<void> {
+    for (const view of [...this.views].filter((candidate) => candidate.sourcePath === sourcePath)) {
+      await callback(view);
+    }
   }
 }

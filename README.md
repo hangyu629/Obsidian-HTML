@@ -33,7 +33,7 @@ npm run build
 Copy the release files into your Vault's plugin directory. Keeping the folder name equal to the manifest ID is recommended.
 
 ```text
-<Vault>/.obsidian/plugins/html-preview/
+<Vault>/.obsidian/plugins/obsidian-html/
   main.js
   manifest.json
   styles.css
@@ -177,7 +177,7 @@ npm run build
 将发布文件复制到 Vault 的插件目录。建议目录名与 manifest ID 保持一致：
 
 ```text
-<Vault>/.obsidian/plugins/html-preview/
+<Vault>/.obsidian/plugins/obsidian-html/
   main.js
   manifest.json
   styles.css

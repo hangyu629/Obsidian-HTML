@@ -68,4 +68,23 @@ describe("AnnotationService", () => {
     expect(await service.focus("notes/a.md", annotation().id)).toBe(false);
     expect(older).toHaveBeenCalledWith(annotation().id);
   });
+
+  it("pushes save and delete updates directly into matching rendered views", async () => {
+    const { service } = harness();
+    const current = annotation();
+    const saveToView = vi.fn(async () => undefined);
+    const removeFromView = vi.fn(async () => undefined);
+    service.registerView({
+      sourcePath: "notes/a.md",
+      focusAnnotation: vi.fn(async () => false),
+      removeAnnotation: removeFromView,
+      saveAnnotation: saveToView
+    });
+
+    await service.save("notes/a.md", current);
+    await service.remove(current);
+
+    expect(saveToView).toHaveBeenCalledWith(current);
+    expect(removeFromView).toHaveBeenCalledWith(current.id);
+  });
 });

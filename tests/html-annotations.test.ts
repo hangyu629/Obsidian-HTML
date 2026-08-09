@@ -42,13 +42,21 @@ function existingAnnotation(): HtmlAnnotation {
 }
 
 function createHarness(initial: readonly HtmlAnnotation[] = []) {
+  let currentAnnotations = [...initial];
+  const listeners = new Set<() => void>();
   const annotationService = {
     focus: vi.fn(async () => false),
-    load: vi.fn(async () => [...initial]),
+    load: vi.fn(async () => [...currentAnnotations]),
     registerView: vi.fn(() => () => undefined),
-    remove: vi.fn(async () => undefined),
+    remove: vi.fn(async (annotation: HtmlAnnotation) => {
+      currentAnnotations = currentAnnotations.filter((item) => item.id !== annotation.id);
+      for (const listener of listeners) listener();
+    }),
     save: vi.fn(async () => undefined),
-    subscribe: vi.fn(() => () => undefined)
+    subscribe: vi.fn((_sourcePath: string, listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    })
   };
   const app = {
     vault: {
@@ -309,5 +317,19 @@ describe("HtmlPreviewView annotations", () => {
     await Promise.resolve();
 
     expect(annotationService.save).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the HTML iframe after an external annotation deletion", async () => {
+    const existing = existingAnnotation();
+    const { annotationService, view } = createHarness([existing]);
+    await view.onLoadFile(createFile("pages/index.html"));
+
+    expect(view.contentEl.querySelector("iframe")?.srcdoc).toContain(existing.id);
+
+    await annotationService.remove(existing);
+
+    await vi.waitFor(() => {
+      expect(view.contentEl.querySelector("iframe")?.srcdoc).not.toContain(existing.id);
+    });
   });
 });

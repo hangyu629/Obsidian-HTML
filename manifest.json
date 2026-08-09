@@ -1,6 +1,6 @@
 {
-  "id": "html-preview",
-  "name": "HTML Preview",
+  "id": "obsidian-html",
+  "name": "Obsidian HTML",
   "version": "0.3.0",
   "minAppVersion": "1.5.0",
   "description": "Preview and non-destructively clean up HTML and HTM files in your vault.",

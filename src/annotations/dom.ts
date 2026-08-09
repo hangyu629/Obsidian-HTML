@@ -235,6 +235,13 @@ export function applyAnnotationHighlights(
   return resolvedAnnotations;
 }
 
+export function clearAnnotationHighlights(root: HTMLElement): void {
+  for (const mark of root.querySelectorAll("mark[data-obsidian-html-preview-annotation]")) {
+    mark.replaceWith(...Array.from(mark.childNodes));
+  }
+  root.normalize();
+}
+
 export function annotationFromMark(
   root: HTMLElement,
   target: EventTarget | null
