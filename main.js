@@ -629,6 +629,19 @@ var AnnotationSidebarView = class extends import_obsidian3.ItemView {
     bulkDelete.className = "annotation-sidebar-bulk-delete";
     bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
     bulkDelete.textContent = "\u5220\u9664\u5F53\u524D\u7B5B\u9009";
+    const bulkColor = document.createElement("select");
+    bulkColor.className = "annotation-sidebar-bulk-color";
+    bulkColor.setAttribute("aria-label", "Batch annotation color");
+    const noColor = document.createElement("option");
+    noColor.value = "";
+    noColor.textContent = "\u6279\u91CF\u6539\u8272";
+    bulkColor.append(noColor);
+    for (const color of ["yellow", "green", "blue", "pink", "violet"]) {
+      const option = document.createElement("option");
+      option.value = color;
+      option.textContent = color;
+      bulkColor.append(option);
+    }
     const exportButton = document.createElement("button");
     exportButton.type = "button";
     exportButton.className = "annotation-sidebar-export";
@@ -650,7 +663,7 @@ var AnnotationSidebarView = class extends import_obsidian3.ItemView {
         exportButton.disabled = false;
       });
     });
-    management.append(sort, exportButton, bulkDelete);
+    management.append(sort, bulkColor, exportButton, bulkDelete);
     fragment.append(management);
     if (error) {
       fragment.append(this.empty(error));
@@ -664,6 +677,22 @@ var AnnotationSidebarView = class extends import_obsidian3.ItemView {
       (left, right) => this.sort === "newest" ? right.target.start - left.target.start : left.target.start - right.target.start
     );
     bulkDelete.disabled = visible.length === 0;
+    bulkColor.disabled = visible.length === 0;
+    bulkColor.addEventListener("change", () => {
+      const sourcePath = this.sourcePath;
+      if (!sourcePath) return;
+      const color = bulkColor.value;
+      bulkColor.value = "";
+      if (!color) return;
+      bulkColor.disabled = true;
+      void Promise.all(visible.map(
+        (annotation) => this.environment.saveAnnotation(sourcePath, { ...annotation, color })
+      )).catch((error2) => {
+        this.environment.showNotice(error2 instanceof Error ? error2.message : String(error2));
+      }).finally(() => {
+        bulkColor.disabled = false;
+      });
+    });
     bulkDelete.addEventListener("click", () => {
       bulkDelete.disabled = true;
       void Promise.all(visible.map((annotation) => this.environment.removeAnnotation(annotation))).catch((error2) => {
@@ -741,6 +770,23 @@ var AnnotationSidebarView = class extends import_obsidian3.ItemView {
         onSave: (updated) => this.environment.saveAnnotation(sourcePath, updated)
       }).open();
     });
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "clickable-icon annotation-sidebar-action";
+    copy.dataset.annotationAction = "copy";
+    copy.setAttribute("aria-label", "Copy annotation");
+    copy.title = "\u590D\u5236\u6458\u5F55\u548C\u6279\u6CE8";
+    (0, import_obsidian3.setIcon)(copy, "copy");
+    copy.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const text = annotation.comment.trim() ? `${annotation.quote}
+
+${annotation.comment}` : annotation.quote;
+      void this.environment.copyText(text).catch((error) => {
+        this.environment.showNotice(error instanceof Error ? error.message : String(error));
+      });
+    });
     const repair = document.createElement("button");
     repair.type = "button";
     repair.className = "clickable-icon annotation-sidebar-action annotation-sidebar-repair";
@@ -781,7 +827,7 @@ var AnnotationSidebarView = class extends import_obsidian3.ItemView {
         );
       });
     });
-    actions.append(edit, repair, remove);
+    actions.append(edit, copy, repair, remove);
     entry.append(item, actions);
     return entry;
   }
@@ -5113,6 +5159,10 @@ var HtmlPreviewPlugin = class extends import_obsidian11.Plugin {
         focusAnnotation: (sourcePath, id) => this.focusAnnotation(sourcePath, id),
         removeAnnotation: (annotation) => this.annotationService.remove(annotation),
         saveAnnotation: (sourcePath, annotation) => this.annotationService.save(sourcePath, annotation),
+        copyText: async (text) => {
+          await navigator.clipboard.writeText(text);
+          new import_obsidian11.Notice("\u5DF2\u590D\u5236\u6458\u5F55\u548C\u6279\u6CE8");
+        },
         showNotice: (message) => new import_obsidian11.Notice(message)
       })
     );

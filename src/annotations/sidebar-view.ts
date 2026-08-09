@@ -17,6 +17,7 @@ export interface AnnotationSidebarEnvironment {
   focusAnnotation(sourcePath: string, id: string): Promise<boolean>;
   removeAnnotation(annotation: HtmlAnnotation): Promise<void>;
   saveAnnotation(sourcePath: string, annotation: HtmlAnnotation): Promise<void>;
+  copyText(text: string): Promise<void>;
   showNotice(message: string): void;
 }
 
@@ -182,6 +183,19 @@ export class AnnotationSidebarView extends ItemView {
     bulkDelete.className = "annotation-sidebar-bulk-delete";
     bulkDelete.setAttribute("aria-label", "Delete filtered annotations");
     bulkDelete.textContent = "删除当前筛选";
+    const bulkColor = document.createElement("select");
+    bulkColor.className = "annotation-sidebar-bulk-color";
+    bulkColor.setAttribute("aria-label", "Batch annotation color");
+    const noColor = document.createElement("option");
+    noColor.value = "";
+    noColor.textContent = "批量改色";
+    bulkColor.append(noColor);
+    for (const color of ["yellow", "green", "blue", "pink", "violet"] as const) {
+      const option = document.createElement("option");
+      option.value = color;
+      option.textContent = color;
+      bulkColor.append(option);
+    }
     const exportButton = document.createElement("button");
     exportButton.type = "button";
     exportButton.className = "annotation-sidebar-export";
@@ -205,7 +219,7 @@ export class AnnotationSidebarView extends ItemView {
           exportButton.disabled = false;
         });
     });
-    management.append(sort, exportButton, bulkDelete);
+    management.append(sort, bulkColor, exportButton, bulkDelete);
     fragment.append(management);
 
     if (error) {
@@ -225,6 +239,22 @@ export class AnnotationSidebarView extends ItemView {
         : left.target.start - right.target.start
     );
     bulkDelete.disabled = visible.length === 0;
+    bulkColor.disabled = visible.length === 0;
+    bulkColor.addEventListener("change", () => {
+      const sourcePath = this.sourcePath;
+      if (!sourcePath) return;
+      const color = bulkColor.value as HtmlAnnotation["color"];
+      bulkColor.value = "";
+      if (!color) return;
+      bulkColor.disabled = true;
+      void Promise.all(visible.map((annotation) =>
+        this.environment.saveAnnotation(sourcePath, { ...annotation, color })
+      )).catch((error) => {
+        this.environment.showNotice(error instanceof Error ? error.message : String(error));
+      }).finally(() => {
+        bulkColor.disabled = false;
+      });
+    });
     bulkDelete.addEventListener("click", () => {
       bulkDelete.disabled = true;
       void Promise.all(visible.map((annotation) => this.environment.removeAnnotation(annotation)))
@@ -308,6 +338,23 @@ export class AnnotationSidebarView extends ItemView {
         onSave: (updated) => this.environment.saveAnnotation(sourcePath, updated)
       }).open();
     });
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "clickable-icon annotation-sidebar-action";
+    copy.dataset.annotationAction = "copy";
+    copy.setAttribute("aria-label", "Copy annotation");
+    copy.title = "复制摘录和批注";
+    setIcon(copy, "copy");
+    copy.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const text = annotation.comment.trim()
+        ? `${annotation.quote}\n\n${annotation.comment}`
+        : annotation.quote;
+      void this.environment.copyText(text).catch((error) => {
+        this.environment.showNotice(error instanceof Error ? error.message : String(error));
+      });
+    });
     const repair = document.createElement("button");
     repair.type = "button";
     repair.className = "clickable-icon annotation-sidebar-action annotation-sidebar-repair";
@@ -351,7 +398,7 @@ export class AnnotationSidebarView extends ItemView {
         );
       });
     });
-    actions.append(edit, repair, remove);
+    actions.append(edit, copy, repair, remove);
     entry.append(item, actions);
     return entry;
   }

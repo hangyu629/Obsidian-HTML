@@ -65,6 +65,7 @@ function harness(focusResult = true) {
   const exportAnnotations = vi.fn(async () => undefined);
   const repairAnnotation = vi.fn(async () => true);
   const searchAnnotations = vi.fn();
+  const copyText = vi.fn(async () => undefined);
   const app = {};
   const leaf = Object.assign(Object.create(WorkspaceLeaf.prototype), { app });
   const view = new AnnotationSidebarView(leaf, {
@@ -75,6 +76,7 @@ function harness(focusResult = true) {
     exportAnnotations,
     repairAnnotation,
     searchAnnotations,
+    copyText,
     showNotice
   });
   document.body.append(view.containerEl);
@@ -85,6 +87,7 @@ function harness(focusResult = true) {
     exportAnnotations,
     repairAnnotation,
     searchAnnotations,
+    copyText,
     showNotice,
     view
   };
@@ -188,6 +191,34 @@ describe("AnnotationSidebarView", () => {
       '[aria-label="Search all annotations"]'
     )?.click();
     expect(searchAnnotations).toHaveBeenCalledOnce();
+  });
+
+  it("copies an annotation quote and comment", async () => {
+    const { copyText, view } = harness();
+    await view.setSource("notes/a.md");
+    view.contentEl.querySelector<HTMLButtonElement>(
+      '[data-annotation-action="copy"]'
+    )?.click();
+    await vi.waitFor(() => {
+      expect(copyText).toHaveBeenCalledWith("Alpha");
+    });
+  });
+
+  it("applies a color to the filtered annotations", async () => {
+    const { annotationService, view } = harness();
+    await view.setSource("notes/a.md");
+    const select = view.contentEl.querySelector<HTMLSelectElement>(
+      '[aria-label="Batch annotation color"]'
+    )!;
+    select.value = "violet";
+    select.dispatchEvent(new Event("change"));
+    await vi.waitFor(() => {
+      expect(annotationService.save).toHaveBeenCalledTimes(3);
+    });
+    expect(annotationService.save).toHaveBeenCalledWith(
+      "notes/a.md",
+      expect.objectContaining({ color: "violet" })
+    );
   });
 
   it("focuses a clicked annotation and marks unresolved anchors", async () => {

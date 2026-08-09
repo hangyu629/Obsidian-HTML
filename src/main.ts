@@ -90,6 +90,10 @@ export default class HtmlPreviewPlugin extends Plugin {
           removeAnnotation: (annotation) => this.annotationService.remove(annotation),
           saveAnnotation: (sourcePath, annotation) =>
             this.annotationService.save(sourcePath, annotation),
+          copyText: async (text) => {
+            await navigator.clipboard.writeText(text);
+            new Notice("已复制摘录和批注");
+          },
           showNotice: (message) => new Notice(message)
         })
     );

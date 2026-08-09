@@ -60,6 +60,8 @@ The repository tracks the Obsidian release files: `main.js`, `manifest.json`, an
 5. Use **Undo cleanup** for the latest cleanup in the current view, or use **Manage cleanup rules** to restore, reset, or promote saved rules.
 6. Select page text and use the contextual **Color** or **Comment** action. Click an existing highlight to change its color, edit its comment, or delete it.
 7. Run **Open annotation sidebar** from the command palette to browse and locate annotations for the current file. The pane is restored automatically when the plugin is re-enabled.
+8. In the Annotation pane, use the search icon or **Search annotations across the Vault** to search excerpts, comments, and source paths. Filter by folder, color, or annotation type, then select a result to open and locate it.
+9. Use the item actions to edit, copy, repair, or delete an annotation. **Repair** keeps the annotation's ID, color, and comment while you select a replacement passage. The management row also supports filtered bulk color changes and Markdown export.
 
 Page cleanup and HTML annotations require **Allow page JavaScript** in the plugin settings. When disabled, HTML files still render, but page scripts, cleanup replay, and HTML annotation interactions are disabled.
 
@@ -119,7 +121,7 @@ The plugin never rewrites HTML or Markdown source files. Cleanup rules and annot
 .html-preview/annotations/pages/<source path>.json
 ```
 
-Each annotation stores its excerpt, surrounding text, offsets, and optional comment. A substantially rewritten source document can make an annotation unresolvable; delete the old annotation and add a new one in that case. Whether these files sync depends on whether your sync provider includes hidden folders.
+Each annotation stores its excerpt, surrounding text, offsets, and optional comment. If a substantially rewritten source document leaves an annotation unresolved, choose **Repair** in the Annotation pane, select replacement text, and save the updated target. Whether these files sync depends on whether your sync provider includes hidden folders.
 
 ### Security and Compatibility
 
@@ -204,6 +206,8 @@ npm run check     # 测试、类型检查、生产构建和发布校验
 5. 使用 **Undo cleanup** 撤销当前视图中的最近一次清理，或使用 **Manage cleanup rules** 恢复、清空或提升已保存的规则。
 6. 选择页面文字，使用浮动的 **颜色** 或 **注释** 操作。点击已有高亮可以修改颜色、编辑批注或删除。
 7. 从命令面板执行 **Open annotation sidebar**，在右侧浏览并定位当前文件的批注。插件重新启用后，侧栏会自动恢复。
+8. 在“注释”栏点击搜索图标，或从命令面板执行 **Search annotations across the Vault**，即可搜索摘录、批注正文和来源文件。支持按文件夹、颜色和批注类型筛选，点击结果会打开并定位原文。
+9. 每条批注支持编辑、复制、重新定位和删除。**重新定位**会保留批注 ID、颜色和正文，只需重新选择对应的新文本并保存。管理栏还支持按当前筛选结果批量改色和导出 Markdown。
 
 页面清理和 HTML 批注依赖插件设置中的 **Allow page JavaScript**。关闭后，HTML 文件仍可预览，但页面脚本、清理规则回放和 HTML 批注交互会被禁用。
 
@@ -263,7 +267,7 @@ html-preview.theme: dark
 .html-preview/annotations/pages/<source path>.json
 ```
 
-每条批注会保存摘录、前后文、文本位置和可选批注正文。源文档发生大幅改写后，批注可能无法定位；此时删除旧批注并重新添加即可。是否同步这些文件，取决于同步工具是否包含隐藏目录。
+每条批注会保存摘录、前后文、文本位置和可选批注正文。源文档发生大幅改写后，批注可能无法定位；此时可在“注释”栏点击 **重新定位**，选择新的对应文本后保存。是否同步这些文件，取决于同步工具是否包含隐藏目录。
 
 ### 安全与兼容性
 

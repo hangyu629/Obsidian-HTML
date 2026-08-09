@@ -32,7 +32,7 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Search quote text and comment text.
   - Filter by file, folder, color, and comment status.
   - Open the source file and focus the selected annotation.
-- [ ] `pending` Expand annotation workflow controls
+- [x] `done` Expand annotation workflow controls
   - Add keyboard shortcuts, copy quote/comment actions, and batch color/export operations.
   - Keep destructive batch actions explicit and recoverable.
 - [ ] `pending` Expand the template system
