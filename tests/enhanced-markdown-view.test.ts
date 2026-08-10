@@ -1,4 +1,4 @@
-import { TFile, WorkspaceLeaf } from "obsidian";
+import { MarkdownRenderer, TFile, WorkspaceLeaf } from "obsidian";
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,7 @@ import {
 import type { HtmlAnnotation } from "../src/annotations/types";
 import { PreviewCoordinator } from "../src/preview/preview-coordinator";
 import { BUILT_IN_TEMPLATE } from "../src/markdown/templates/built-in";
+import { COMMAND_LIBRARY_TEMPLATE } from "../src/markdown/templates/command-library";
 import type { MarkdownTemplatePackage } from "../src/markdown/templates/types";
 
 function file(path: string): TFile {
@@ -36,7 +37,8 @@ function harness(
     templateId: "book-editorial",
     themeId: "light"
   })),
-  initialAnnotations: readonly HtmlAnnotation[] = []
+  initialAnnotations: readonly HtmlAnnotation[] = [],
+  loadedTemplate: MarkdownTemplatePackage = template()
 ) {
   let currentAnnotations = [...initialAnnotations];
   const listeners = new Set<() => void>();
@@ -74,7 +76,7 @@ function harness(
     coordinator,
     createAnnotationId: () => "11111111111111111111111111111111",
     getFrontmatter: () => ({}),
-    loadTemplate: vi.fn(async () => template()),
+    loadTemplate: vi.fn(async () => loadedTemplate),
     resolveAsset: (path) => `app://vault/${path}`,
     resolveTemplate,
     onReturnToMarkdown,
@@ -161,6 +163,37 @@ describe("EnhancedMarkdownView", () => {
         "Manage annotations"
       ])
     );
+  });
+
+  it("renders command cards inside the annotation content surface after a coordinator refresh", async () => {
+    const render = vi
+      .spyOn(MarkdownRenderer, "render")
+      .mockImplementation(async (_app, _source, element) => {
+        element.innerHTML = `
+          <h2>Git</h2>
+          <div class="callout" data-callout="command">
+            <div class="callout-title"><div class="callout-title-inner">Status</div></div>
+            <div class="callout-content"><pre><code class="language-bash">git status</code></pre></div>
+          </div>`;
+      });
+    const { coordinator, view } = harness(
+      async () => "## Git",
+      vi.fn(() => ({ source: "default" as const, templateId: "command-library", themeId: "light" })),
+      [],
+      COMMAND_LIBRARY_TEMPLATE
+    );
+
+    await view.onLoadFile(file("notes/commands.md"));
+    const content = view.contentEl.querySelector<HTMLElement>("[data-slot=content]")!;
+    expect(content.querySelectorAll(".command-library-card")).toHaveLength(1);
+
+    coordinator.notify("notes/commands.md");
+    await vi.waitFor(() => {
+      expect(view.contentEl.querySelectorAll(".command-library-copy")).toHaveLength(1);
+    });
+    expect(view.contentEl.querySelector("[data-slot=content] .command-library-card"))
+      .not.toBeNull();
+    render.mockRestore();
   });
 
   it("persists recovered annotation anchors after Markdown text shifts", async () => {

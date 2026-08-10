@@ -6,6 +6,7 @@ import {
   BUILT_IN_TEMPLATE,
   builtInTemplateFor
 } from "../src/markdown/templates/built-in";
+import { COMMAND_LIBRARY_TEMPLATE } from "../src/markdown/templates/command-library";
 import type { MarkdownTemplatePackage } from "../src/markdown/templates/types";
 
 function template(layout = BUILT_IN_TEMPLATE.layout): MarkdownTemplatePackage {
@@ -117,6 +118,45 @@ describe("renderEnhancedMarkdown", () => {
     });
 
     expect(source).toBe("# Original\n\n[[Linked note]]");
+  });
+
+  it("mounts command-library interactions only for the trusted command template", async () => {
+    const render = vi
+      .spyOn(MarkdownRenderer, "render")
+      .mockImplementation(async (_app, _source, element) => {
+        element.innerHTML = `
+          <h2>Git</h2>
+          <div class="callout" data-callout="command">
+            <div class="callout-title"><div class="callout-title-inner">Status</div></div>
+            <div class="callout-content"><pre><code class="language-bash">git status</code></pre></div>
+          </div>`;
+      });
+    const root = document.createElement("article");
+
+    await renderEnhancedMarkdown({
+      app: {} as never,
+      component: new Component(),
+      copyText: vi.fn(async () => undefined),
+      root,
+      source: "## Git",
+      sourcePath: "notes/commands.md",
+      template: COMMAND_LIBRARY_TEMPLATE
+    });
+
+    expect(root.querySelectorAll(".command-library-card")).toHaveLength(1);
+    expect(root.querySelectorAll(".command-library-category-button")).toHaveLength(1);
+
+    const editorialRoot = document.createElement("article");
+    await renderEnhancedMarkdown({
+      app: {} as never,
+      component: new Component(),
+      root: editorialRoot,
+      source: "## Git",
+      sourcePath: "notes/commands.md",
+      template: BUILT_IN_TEMPLATE
+    });
+    expect(editorialRoot.querySelector(".command-library-card")).toBeNull();
+    render.mockRestore();
   });
 
   it("provides the editorial cover, themes, and core Markdown styling contract", () => {

@@ -137,7 +137,8 @@ describe("Markdown plugin integration", () => {
     expect(plugin.settings.defaultTemplateId).toBe("book-editorial");
     expect(plugin.listMarkdownTemplates().map((template) => template.id)).toEqual([
       "book-editorial",
-      "magazine-research"
+      "magazine-research",
+      "command-library"
     ]);
     expect(MARKDOWN_TEMPLATE_ROOT).toBe(".html-preview/markdown-templates");
   });

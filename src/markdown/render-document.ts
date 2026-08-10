@@ -1,18 +1,22 @@
 import { Component, MarkdownRenderer, type App } from "obsidian";
 
 import { scopeTemplateCss } from "./css-scope";
+import { mountCommandLibrary } from "./command-library";
 import { markdownTemplatePath } from "./templates/catalog";
 import { BUILT_IN_TEMPLATE } from "./templates/built-in";
+import { COMMAND_LIBRARY_TEMPLATE_ID } from "./templates/command-library";
 import type { MarkdownTemplatePackage } from "./templates/types";
 
 export interface RenderEnhancedMarkdownInput {
   app: App;
   component: Component;
+  copyText?: (text: string) => Promise<void>;
   frontmatter?: Record<string, unknown>;
   resolveAsset?: (vaultPath: string) => string | null;
   root: HTMLElement;
   source: string;
   sourcePath: string;
+  showNotice?: (message: string) => void;
   template: MarkdownTemplatePackage;
   themeId?: string;
 }
@@ -138,6 +142,11 @@ function resolveCssAssets(
   });
 }
 
+async function copyCommandText(text: string): Promise<void> {
+  if (!navigator.clipboard) throw new Error("Clipboard is unavailable.");
+  await navigator.clipboard.writeText(text);
+}
+
 export async function renderEnhancedMarkdown(
   input: RenderEnhancedMarkdownInput
 ): Promise<RenderEnhancedMarkdownResult> {
@@ -179,6 +188,14 @@ export async function renderEnhancedMarkdown(
 
   const tocSlot = input.root.querySelector('[data-slot="toc"]');
   if (tocSlot instanceof HTMLElement) renderToc(tocSlot, contentSlot);
+  if (template.manifest.id === COMMAND_LIBRARY_TEMPLATE_ID) {
+    mountCommandLibrary({
+      component: input.component,
+      copyText: input.copyText ?? copyCommandText,
+      root: input.root,
+      showNotice: input.showNotice ?? (() => {})
+    });
+  }
 
   const themeId = input.themeId ?? template.manifest.defaultTheme;
   const theme = template.themes[themeId] ?? template.themes[template.manifest.defaultTheme] ?? "";

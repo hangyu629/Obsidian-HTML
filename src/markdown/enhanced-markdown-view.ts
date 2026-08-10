@@ -275,6 +275,7 @@ export class EnhancedMarkdownView extends FileView {
       const result = await renderEnhancedMarkdown({
         app: this.app,
         component,
+        copyText: (text) => navigator.clipboard.writeText(text),
         frontmatter:
           typeof frontmatter === "object" && frontmatter !== null
             ? (frontmatter as Record<string, unknown>)
@@ -283,6 +284,7 @@ export class EnhancedMarkdownView extends FileView {
         root,
         source,
         sourcePath: file.path,
+        showNotice: this.environment.showNotice,
         template,
         themeId: selection.themeId
       });
