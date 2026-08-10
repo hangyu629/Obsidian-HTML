@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile } from "obsidian";
+import { Notice, Plugin, TFile, type Editor } from "obsidian";
 
 import { HtmlAnnotationStore } from "./annotations/annotation-store";
 import { AnnotationService } from "./annotations/annotation-service";
@@ -40,6 +40,12 @@ import {
 import type { MarkdownTemplateSummary } from "./markdown/templates/types";
 import { resolveMarkdownTemplate } from "./markdown/rules";
 import { MarkdownTemplateModal } from "./markdown/template-modal";
+import {
+  buildCommandCard,
+  commandCardInsertionText,
+  type CommandCardLanguage
+} from "./markdown/command-card";
+import { InsertCommandCardModal } from "./markdown/command-card-modal";
 import { ReaderPageStore } from "./reader/page-store";
 
 export default class HtmlPreviewPlugin extends Plugin {
@@ -56,6 +62,7 @@ export default class HtmlPreviewPlugin extends Plugin {
   private markdownTemplateIds = new Set(["book-editorial"]);
   private readonly enhancedLeaves = new WeakSet<object>();
   private lastAnnotationSourcePath: string | null = null;
+  private lastCommandCardLanguage: CommandCardLanguage = "bash";
   private readonly nativeMarkdownPaths = new WeakMap<object, string>();
 
   async onload(): Promise<void> {
@@ -164,6 +171,11 @@ export default class HtmlPreviewPlugin extends Plugin {
         const file = (leaf?.view as any)?.file;
         if (file instanceof TFile) void this.openEnhancedMarkdown(file.path, "manual");
       }
+    });
+    this.addCommand({
+      id: "insert-command-card",
+      name: "Insert command card",
+      editorCallback: (editor) => this.openInsertCommandCardModal(editor)
     });
     this.addCommand({
       id: "search-vault-annotations",
@@ -438,6 +450,25 @@ export default class HtmlPreviewPlugin extends Plugin {
         void this.openEnhancedMarkdown(sourcePath, "manual", undefined, selection);
       },
       selected: selected ?? undefined
+    }).open();
+  }
+
+  private openInsertCommandCardModal(editor: Editor): void {
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const initialCommand = editor.getRange(from, to);
+    const before = editor.getLine(from.line).slice(0, from.ch);
+    const after = editor.getLine(to.line).slice(to.ch);
+
+    new InsertCommandCardModal(this.app, {
+      initialCommand,
+      initialLanguage: this.lastCommandCardLanguage,
+      onInsert: (input) => {
+        const card = buildCommandCard(input);
+        const insertion = commandCardInsertionText(card, before, after);
+        this.lastCommandCardLanguage = input.language;
+        editor.replaceRange(insertion, from, to);
+      }
     }).open();
   }
 

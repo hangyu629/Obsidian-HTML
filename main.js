@@ -2100,7 +2100,7 @@ __export(main_exports, {
   default: () => HtmlPreviewPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian14 = require("obsidian");
+var import_obsidian15 = require("obsidian");
 
 // src/annotations/types.ts
 var ANNOTATION_COLORS = [
@@ -8375,6 +8375,245 @@ var MarkdownTemplateModal = class extends import_obsidian13.Modal {
   }
 };
 
+// src/markdown/command-card.ts
+var COMMAND_CARD_LANGUAGES = [
+  "bash",
+  "shell",
+  "powershell",
+  "python",
+  "javascript",
+  "typescript",
+  "sql",
+  "dockerfile",
+  "yaml",
+  "json",
+  "text"
+];
+function normalizeLineEndings(value) {
+  return value.replace(/\r\n?/g, "\n");
+}
+function trimEmptyEdgeLines(value) {
+  const lines = normalizeLineEndings(value).split("\n");
+  while (lines[0]?.trim() === "") {
+    lines.shift();
+  }
+  while (lines.at(-1)?.trim() === "") {
+    lines.pop();
+  }
+  return lines.join("\n");
+}
+function isCommandCardLanguage(value) {
+  return COMMAND_CARD_LANGUAGES.includes(value);
+}
+function normalizeCommandCardInput(input) {
+  const language = input.language.trim().toLowerCase();
+  return {
+    command: trimEmptyEdgeLines(input.command),
+    description: trimEmptyEdgeLines(input.description),
+    language: isCommandCardLanguage(language) ? language : "text",
+    title: normalizeLineEndings(input.title).trim().replace(/\s+/g, " ")
+  };
+}
+function validateCommandCardInput(input) {
+  const normalized = normalizeCommandCardInput(input);
+  if (!normalized.title) {
+    return "Enter a title.";
+  }
+  if (!normalized.command.trim()) {
+    return "Enter a command.";
+  }
+  return null;
+}
+function prefixCalloutLines(value) {
+  return value.split("\n").map((line) => `> ${line}`);
+}
+function commandFence(command) {
+  const longestRun = Math.max(
+    0,
+    ...Array.from(command.matchAll(/`+/g), (match) => match[0].length)
+  );
+  return "`".repeat(Math.max(3, longestRun + 1));
+}
+function buildCommandCard(input) {
+  const validationError = validateCommandCardInput(input);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+  const normalized = normalizeCommandCardInput(input);
+  const fence = commandFence(normalized.command);
+  const lines = [
+    `> [!command] ${normalized.title}`,
+    `> ${fence}${normalized.language}`,
+    ...prefixCalloutLines(normalized.command),
+    `> ${fence}`
+  ];
+  if (normalized.description) {
+    lines.push(...prefixCalloutLines(normalized.description));
+  }
+  return lines.join("\n");
+}
+function commandCardInsertionText(card, before, after) {
+  const leading = before === "" ? "" : before.trim() ? "\n\n" : "\n";
+  const trailing = after.trim() ? "\n\n" : "\n";
+  return `${leading}${card}${trailing}`;
+}
+
+// src/markdown/command-card-modal.ts
+var import_obsidian14 = require("obsidian");
+var LANGUAGE_LABELS = {
+  bash: "Bash",
+  dockerfile: "Dockerfile",
+  javascript: "JavaScript",
+  json: "JSON",
+  powershell: "PowerShell",
+  python: "Python",
+  shell: "Shell",
+  sql: "SQL",
+  text: "Plain text",
+  typescript: "TypeScript",
+  yaml: "YAML"
+};
+var InsertCommandCardModal = class extends import_obsidian14.Modal {
+  constructor(app, options) {
+    super(app);
+    this.options = options;
+  }
+  options;
+  errorEl = null;
+  fields = null;
+  submitted = false;
+  handleKeydown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.close();
+      return;
+    }
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      this.submit();
+    }
+  };
+  onOpen() {
+    this.submitted = false;
+    this.titleEl.textContent = "Insert command card";
+    this.contentEl.replaceChildren();
+    const root = document.createElement("form");
+    root.className = "command-card-modal";
+    const intro = document.createElement("p");
+    intro.className = "command-card-modal-intro";
+    intro.textContent = "Create a reusable command callout for Enhanced Preview.";
+    const metadata = document.createElement("div");
+    metadata.className = "command-card-modal-metadata";
+    const title = document.createElement("input");
+    title.type = "text";
+    title.autocomplete = "off";
+    title.placeholder = "For example, Check repository status";
+    title.dataset.commandCardField = "title";
+    const language = document.createElement("select");
+    language.dataset.commandCardField = "language";
+    for (const value of COMMAND_CARD_LANGUAGES) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = LANGUAGE_LABELS[value];
+      language.append(option);
+    }
+    language.value = this.options.initialLanguage;
+    metadata.append(
+      this.createField("Title", title, true),
+      this.createField("Language", language)
+    );
+    const command = document.createElement("textarea");
+    command.rows = 6;
+    command.spellcheck = false;
+    command.placeholder = "Enter one or more commands";
+    command.value = this.options.initialCommand;
+    command.dataset.commandCardField = "command";
+    const description = document.createElement("textarea");
+    description.rows = 3;
+    description.placeholder = "Add context, prerequisites, or expected output";
+    description.dataset.commandCardField = "description";
+    this.errorEl = document.createElement("p");
+    this.errorEl.className = "command-card-modal-error";
+    this.errorEl.setAttribute("role", "alert");
+    this.errorEl.setAttribute("aria-live", "polite");
+    const actions = document.createElement("div");
+    actions.className = "command-card-modal-actions";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel";
+    cancel.dataset.commandCardAction = "cancel";
+    cancel.addEventListener("click", () => this.close());
+    const insert = document.createElement("button");
+    insert.type = "submit";
+    insert.className = "mod-cta";
+    insert.textContent = "Insert card";
+    insert.dataset.commandCardAction = "insert";
+    actions.append(cancel, insert);
+    root.append(
+      intro,
+      metadata,
+      this.createField("Command", command, true),
+      this.createField("Description", description),
+      this.errorEl,
+      actions
+    );
+    this.contentEl.append(root);
+    this.fields = { command, description, language, title };
+    root.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.submit();
+    });
+    this.contentEl.addEventListener("keydown", this.handleKeydown);
+    for (const input of [title, language, command, description]) {
+      input.addEventListener("input", () => this.showError(""));
+    }
+    title.focus();
+  }
+  onClose() {
+    this.contentEl.removeEventListener("keydown", this.handleKeydown);
+    this.contentEl.replaceChildren();
+    this.fields = null;
+    this.errorEl = null;
+  }
+  createField(labelText, control, required = false) {
+    const label = document.createElement("label");
+    label.className = "command-card-modal-field";
+    const heading = document.createElement("span");
+    heading.className = "command-card-modal-label";
+    heading.textContent = labelText;
+    if (required) {
+      const marker = document.createElement("span");
+      marker.className = "command-card-modal-required";
+      marker.textContent = "Required";
+      heading.append(marker);
+    }
+    label.append(heading, control);
+    return label;
+  }
+  submit() {
+    if (this.submitted || !this.fields) return;
+    const input = {
+      command: this.fields.command.value,
+      description: this.fields.description.value,
+      language: this.fields.language.value,
+      title: this.fields.title.value
+    };
+    const error = validateCommandCardInput(input);
+    if (error) {
+      this.showError(error);
+      const target = error === "Enter a title." ? this.fields.title : this.fields.command;
+      target.focus();
+      return;
+    }
+    this.submitted = true;
+    this.options.onInsert(normalizeCommandCardInput(input));
+    this.close();
+  }
+  showError(message) {
+    if (this.errorEl) this.errorEl.textContent = message;
+  }
+};
+
 // src/reader/page-store.ts
 function validateSourcePath3(path) {
   if (path.length === 0 || path.startsWith("/") || path.includes("\\") || path.includes("\0") || path.split("/").includes("..")) {
@@ -8442,7 +8681,7 @@ var ReaderPageStore = class {
 };
 
 // src/main.ts
-var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
+var HtmlPreviewPlugin = class extends import_obsidian15.Plugin {
   coordinator = new PreviewCoordinator();
   annotationStore;
   annotationService;
@@ -8456,6 +8695,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
   markdownTemplateIds = /* @__PURE__ */ new Set(["book-editorial"]);
   enhancedLeaves = /* @__PURE__ */ new WeakSet();
   lastAnnotationSourcePath = null;
+  lastCommandCardLanguage = "bash";
   nativeMarkdownPaths = /* @__PURE__ */ new WeakMap();
   async onload() {
     await this.loadSettings();
@@ -8463,7 +8703,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
     this.cleanupStore = new CleanupRuleStore(
       this.app.vault.adapter,
       ({ message, path }) => {
-        new import_obsidian14.Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
+        new import_obsidian15.Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
       }
     );
     this.readerPageStore = new ReaderPageStore(this.app.vault.adapter);
@@ -8486,9 +8726,9 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
         saveAnnotation: (sourcePath, annotation) => this.annotationService.save(sourcePath, annotation),
         copyText: async (text) => {
           await navigator.clipboard.writeText(text);
-          new import_obsidian14.Notice("\u5DF2\u590D\u5236\u6458\u5F55\u548C\u6279\u6CE8");
+          new import_obsidian15.Notice("\u5DF2\u590D\u5236\u6458\u5F55\u548C\u6279\u6CE8");
         },
-        showNotice: (message) => new import_obsidian14.Notice(message)
+        showNotice: (message) => new import_obsidian15.Notice(message)
       })
     );
     this.registerView(
@@ -8507,7 +8747,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
         },
         resolveAsset: (path) => {
           const file = this.app.vault.getAbstractFileByPath(path);
-          return file instanceof import_obsidian14.TFile ? this.app.vault.getResourcePath(file) : null;
+          return file instanceof import_obsidian15.TFile ? this.app.vault.getResourcePath(file) : null;
         },
         resolveTemplate: (path, frontmatter, mode) => resolveMarkdownTemplate(
           path,
@@ -8517,7 +8757,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
           mode
         ),
         showNotice: (message) => {
-          new import_obsidian14.Notice(message);
+          new import_obsidian15.Notice(message);
         }
       })
     );
@@ -8535,7 +8775,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
         },
         readerPageStore: this.readerPageStore,
         showNotice: (message) => {
-          new import_obsidian14.Notice(message);
+          new import_obsidian15.Notice(message);
         }
       })
     );
@@ -8547,8 +8787,13 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
       callback: () => {
         const leaf = this.app.workspace.getMostRecentLeaf();
         const file = leaf?.view?.file;
-        if (file instanceof import_obsidian14.TFile) void this.openEnhancedMarkdown(file.path, "manual");
+        if (file instanceof import_obsidian15.TFile) void this.openEnhancedMarkdown(file.path, "manual");
       }
+    });
+    this.addCommand({
+      id: "insert-command-card",
+      name: "Insert command card",
+      editorCallback: (editor) => this.openInsertCommandCardModal(editor)
     });
     this.addCommand({
       id: "search-vault-annotations",
@@ -8582,14 +8827,14 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
     });
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (file instanceof import_obsidian14.TFile) {
+        if (file instanceof import_obsidian15.TFile) {
           this.coordinator.notify(file.path);
         }
       })
     );
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        if (file instanceof import_obsidian14.TFile) {
+        if (file instanceof import_obsidian15.TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
         }
@@ -8597,7 +8842,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian14.TFile) {
+        if (file instanceof import_obsidian15.TFile) {
           this.knownVaultPaths.delete(file.path);
           this.coordinator.notify(file.path);
         }
@@ -8607,13 +8852,13 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
       this.app.vault.on("rename", (file, oldPath) => {
         this.knownVaultPaths.delete(oldPath);
         this.coordinator.notify(oldPath);
-        if (file instanceof import_obsidian14.TFile) {
+        if (file instanceof import_obsidian15.TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
           if (isHtmlPath(oldPath) || isHtmlPath(file.path)) {
             void this.cleanupStore.migrateFile(oldPath, file.path).catch((error) => {
               const detail = error instanceof Error ? error.message : String(error);
-              new import_obsidian14.Notice(`Could not migrate HTML cleanup rules: ${detail}`);
+              new import_obsidian15.Notice(`Could not migrate HTML cleanup rules: ${detail}`);
             });
           }
         }
@@ -8656,7 +8901,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
     )[0];
     const leaf = existing ?? this.app.workspace.getRightLeaf(false);
     if (!leaf) {
-      new import_obsidian14.Notice("\u65E0\u6CD5\u6253\u5F00\u6CE8\u91CA\u4FA7\u680F\u3002");
+      new import_obsidian15.Notice("\u65E0\u6CD5\u6253\u5F00\u6CE8\u91CA\u4FA7\u680F\u3002");
       return;
     }
     if (!existing) {
@@ -8667,8 +8912,8 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
   }
   async updateAnnotationSidebars(activeLeaf) {
     const file = activeLeaf?.view?.file;
-    const extension = file instanceof import_obsidian14.TFile ? file.extension.toLowerCase() : "";
-    let sourcePath = file instanceof import_obsidian14.TFile && (extension === "html" || extension === "htm" || extension === "md") ? file.path : null;
+    const extension = file instanceof import_obsidian15.TFile ? file.extension.toLowerCase() : "";
+    let sourcePath = file instanceof import_obsidian15.TFile && (extension === "html" || extension === "htm" || extension === "md") ? file.path : null;
     if (sourcePath) {
       this.lastAnnotationSourcePath = sourcePath;
     } else if (activeLeaf?.view?.getViewType?.() === ANNOTATION_SIDEBAR_VIEW_TYPE) {
@@ -8705,7 +8950,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
     this.enhancedLeaves.add(view);
     view.addAction?.("book-open-check", "Enhanced reading", () => {
       const file = view.file;
-      if (file instanceof import_obsidian14.TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
+      if (file instanceof import_obsidian15.TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
     });
   }
   async maybeAutoOpen(leaf) {
@@ -8713,7 +8958,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
       return;
     }
     const file = leaf.view.file;
-    if (!(file instanceof import_obsidian14.TFile)) return;
+    if (!(file instanceof import_obsidian15.TFile)) return;
     if (this.nativeMarkdownPaths.get(leaf) === file.path) return;
     this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
@@ -8749,7 +8994,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
   }
   async openEnhancedMarkdown(sourcePath, mode, leaf = this.app.workspace.getMostRecentLeaf(), selected) {
     const file = this.app.vault.getAbstractFileByPath(sourcePath);
-    if (!(file instanceof import_obsidian14.TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
+    if (!(file instanceof import_obsidian15.TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
     this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
     const selection = selected ? { source: "default", ...selected } : resolveMarkdownTemplate(
@@ -8760,7 +9005,7 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
       mode
     );
     if (!selection) {
-      new import_obsidian14.Notice("No valid Markdown template is available for this note.");
+      new import_obsidian15.Notice("No valid Markdown template is available for this note.");
       return;
     }
     const returnMode = leaf.view?.getMode?.() === "source" ? "source" : "preview";
@@ -8787,24 +9032,41 @@ var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
       selected: selected ?? void 0
     }).open();
   }
+  openInsertCommandCardModal(editor) {
+    const from = editor.getCursor("from");
+    const to = editor.getCursor("to");
+    const initialCommand = editor.getRange(from, to);
+    const before = editor.getLine(from.line).slice(0, from.ch);
+    const after = editor.getLine(to.line).slice(to.ch);
+    new InsertCommandCardModal(this.app, {
+      initialCommand,
+      initialLanguage: this.lastCommandCardLanguage,
+      onInsert: (input) => {
+        const card = buildCommandCard(input);
+        const insertion = commandCardInsertionText(card, before, after);
+        this.lastCommandCardLanguage = input.language;
+        editor.replaceRange(insertion, from, to);
+      }
+    }).open();
+  }
   async exportAnnotations(sourcePath, annotations) {
     const path = annotationExportPath(sourcePath);
     const content = exportAnnotationMarkdown(sourcePath, annotations);
     const existing = this.app.vault.getAbstractFileByPath(path);
-    if (existing instanceof import_obsidian14.TFile) {
+    if (existing instanceof import_obsidian15.TFile) {
       await this.app.vault.modify(existing, content);
     } else if (existing) {
       throw new Error(`\u65E0\u6CD5\u5BFC\u51FA\u6CE8\u91CA\uFF1A\u76EE\u6807\u8DEF\u5F84\u4E0D\u662F\u6587\u4EF6\uFF1A${path}`);
     } else {
       await this.app.vault.create(path, content);
     }
-    new import_obsidian14.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
+    new import_obsidian15.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
   }
   openAnnotationSearch() {
     new AnnotationSearchModal(this.app, {
       open: async (sourcePath, id) => {
         const file = this.app.vault.getAbstractFileByPath(sourcePath);
-        if (!(file instanceof import_obsidian14.TFile)) return false;
+        if (!(file instanceof import_obsidian15.TFile)) return false;
         await this.app.workspace.openLinkText(sourcePath, "", false);
         await new Promise((resolve) => window.setTimeout(resolve, 0));
         return this.focusAnnotation(sourcePath, id);

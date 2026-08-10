@@ -147,6 +147,8 @@ html-preview.theme: light
 
 In Enhanced reading, category buttons navigate to each `##` section, `/` focuses search, and `Escape` clears it. Search matches category name, card title, command text, and description. The copy control returns the exact text from the first fenced code block, including multiline commands. A `[!command]` callout without a fenced code block remains a normal callout, and the Markdown source is never changed.
 
+To add a card without writing the Callout syntax manually, place the cursor in a Markdown source or Live Preview editor and run **Insert command card** from the command palette. Selected text pre-fills the command field. Enter a title, choose a language from the dropdown, and optionally add a description. Press **Insert card** or `Cmd/Ctrl + Enter` to replace the captured selection with a valid command Callout; press `Escape` or **Cancel** to leave the note unchanged. The last selected language is remembered until the plugin is reloaded.
+
 ### Data and Sync
 
 Enhanced Markdown Reading still never rewrites Markdown source files. HTML source files are only rewritten when you explicitly confirm **Save reading page** or **Restore original page**. Cleanup rules, backups, and annotations are stored in hidden Vault paths:
@@ -331,6 +333,8 @@ html-preview.theme: light
 ````
 
 在增强阅读中，分类按钮会定位到对应的 `##` 区块；按 `/` 聚焦搜索，按 `Escape` 清空搜索。搜索会匹配分类名、卡片标题、命令文本和说明。复制控件会精确复制第一个代码块的文本，包括多行命令。没有代码块的 `[!command]` 会保持为普通 Callout，Markdown 源文件不会被修改。
+
+如果不想手动编写 Callout 语法，可在 Markdown 源码或 Live Preview 编辑器中放置光标，然后从命令面板执行 **Insert command card**。当前选中的文字会自动填入命令输入框。填写标题、从下拉框选择语言，并按需添加说明后，点击 **Insert card** 或按 `Cmd/Ctrl + Enter`，插件会将之前捕获的选区替换为格式正确的命令 Callout；按 `Escape` 或 **Cancel** 会取消且不修改笔记。最近一次选择的语言会保留到插件重新加载为止。
 
 ### 数据与同步
 

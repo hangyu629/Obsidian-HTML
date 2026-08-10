@@ -48,6 +48,7 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Use `##` headings as categories and `[!command]` callouts as command cards without changing Markdown source.
   - Provide category navigation, search across title/code/description/category, exact command copying, light and dark themes, and narrow-pane layout.
   - Keep malformed command callouts readable and preserve Enhanced Markdown annotations.
+  - Verify **Insert command card** from Markdown source and Live Preview: selected-text prefill, language dropdown, optional description, `Cmd/Ctrl + Enter`, cancellation without edits, and session language memory.
 
 - [x] `done` Repair annotations that can no longer be located after source rewrites
   - Start repair from the sidebar and select a replacement passage in HTML Preview or Enhanced Markdown Reading.

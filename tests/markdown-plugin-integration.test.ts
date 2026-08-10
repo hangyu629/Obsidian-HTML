@@ -6,6 +6,42 @@ import { ANNOTATION_SIDEBAR_VIEW_TYPE } from "../src/annotations/sidebar-view";
 import { ENHANCED_MARKDOWN_VIEW_TYPE } from "../src/markdown/enhanced-markdown-view";
 import { MARKDOWN_TEMPLATE_ROOT } from "../src/markdown/templates/catalog";
 
+const commandCardModalHarness = vi.hoisted(() => ({
+  onInsert: null as null | ((input: {
+    command: string;
+    description: string;
+    language: string;
+    title: string;
+  }) => void),
+  open: vi.fn(),
+  options: null as null | {
+    initialCommand: string;
+    initialLanguage: string;
+  }
+}));
+
+vi.mock("../src/markdown/command-card-modal", () => ({
+  InsertCommandCardModal: class {
+    constructor(_app: unknown, options: {
+      initialCommand: string;
+      initialLanguage: string;
+      onInsert(input: {
+        command: string;
+        description: string;
+        language: string;
+        title: string;
+      }): void;
+    }) {
+      commandCardModalHarness.options = options;
+      commandCardModalHarness.onInsert = options.onInsert;
+    }
+
+    open(): void {
+      commandCardModalHarness.open();
+    }
+  }
+}));
+
 function appHarness() {
   const events = new Map<string, (...args: unknown[]) => void>();
   const workspaceLeaves: unknown[] = [];
@@ -82,6 +118,65 @@ function appHarness() {
 }
 
 describe("Markdown plugin integration", () => {
+  it("inserts command cards at the captured editor selection and remembers language", async () => {
+    commandCardModalHarness.options = null;
+    commandCardModalHarness.open.mockClear();
+    const { app } = appHarness();
+    const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
+    await plugin.onload();
+    const command = (plugin as unknown as {
+      commands: Array<{
+        editorCallback?: (editor: unknown) => void;
+        id?: string;
+      }>;
+    }).commands.find((candidate) => candidate.id === "insert-command-card");
+    const from = { ch: 0, line: 2 };
+    const to = { ch: 10, line: 2 };
+    const editor = {
+      getCursor: vi.fn((which: "from" | "to") => which === "from" ? from : to),
+      getLine: vi.fn(() => "git status"),
+      getRange: vi.fn(() => "git status"),
+      replaceRange: vi.fn()
+    };
+
+    expect(command?.editorCallback).toBeTypeOf("function");
+    command?.editorCallback?.(editor);
+    expect(commandCardModalHarness.open).toHaveBeenCalledTimes(1);
+    expect(commandCardModalHarness.options).toMatchObject({
+      initialCommand: "git status",
+      initialLanguage: "bash"
+    });
+
+    commandCardModalHarness.onInsert?.({
+      command: "git status",
+      description: "Show the working tree state.",
+      language: "python",
+      title: "Check status"
+    });
+    expect(editor.replaceRange).toHaveBeenCalledTimes(1);
+    expect(editor.replaceRange).toHaveBeenCalledWith([
+      "> [!command] Check status",
+      "> ```python",
+      "> git status",
+      "> ```",
+      "> Show the working tree state.",
+      ""
+    ].join("\n"), from, to);
+
+    const nextEditor = {
+      getCursor: vi.fn((which: "from" | "to") => which === "from" ? from : to),
+      getLine: vi.fn(() => "npm test  "),
+      getRange: vi.fn(() => "npm test"),
+      replaceRange: vi.fn()
+    };
+    command?.editorCallback?.(nextEditor);
+    expect(commandCardModalHarness.options).toMatchObject({
+      initialCommand: "npm test",
+      initialLanguage: "python"
+    });
+    expect(nextEditor.replaceRange).not.toHaveBeenCalled();
+  });
+
   it("exports annotations to a sibling Markdown file and updates an existing export", async () => {
     const { app } = appHarness();
     const plugin = new HtmlPreviewPlugin(app as never, { id: "test" } as never);
