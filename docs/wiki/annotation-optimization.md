@@ -38,11 +38,16 @@ Items are ordered by user value and implementation dependency. Each item should 
   - Allow an explicit confirmed save to replace the current HTML with the clean reading page, while keeping a restorable hidden backup of the prior source.
   - Preserve annotations, links, images, reading position, and a clear fallback when a page cannot be extracted reliably.
 
-- [ ] `in_progress` Import a webpage from a URL directly into the Vault
+- [ ] `pending` Import a webpage from a URL directly into the Vault
   - Fetch the HTML document, direct asset references, and CSS-linked resources with an Obsidian-native request path.
   - Save the page as `Article Title.html` plus `Article Title-assets/`, and rewrite HTML and CSS references to Vault-local relative paths.
   - Default to opening the imported file in normal HTML preview so import completeness can be checked before cleanup or Smart reading.
-  - Limit v1 to public static and article-style pages; do not promise login-state capture or runtime-rendered sites.
+  - Revisit only with a mature rendered-page capture strategy; the former source-fetch implementation was reverted because it cannot faithfully preserve dynamic sites.
+
+- [ ] `verify` Add a Command Library template for Markdown command reference notes
+  - Use `##` headings as categories and `[!command]` callouts as command cards without changing Markdown source.
+  - Provide category navigation, search across title/code/description/category, exact command copying, light and dark themes, and narrow-pane layout.
+  - Keep malformed command callouts readable and preserve Enhanced Markdown annotations.
 
 - [x] `done` Repair annotations that can no longer be located after source rewrites
   - Start repair from the sidebar and select a replacement passage in HTML Preview or Enhanced Markdown Reading.

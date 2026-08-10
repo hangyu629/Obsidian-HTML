@@ -20,6 +20,7 @@ HTML Preview makes HTML a first-class file type in Obsidian. Copy an externally 
 - Browse excerpts, comments, and highlight-only items in the right-side Annotation pane; select an item to locate it in the document.
 - Render Markdown through Obsidian's native `MarkdownRenderer`, then apply configurable reading layouts and themes.
 - Choose default Markdown templates and themes, map templates to folders, or override them in frontmatter.
+- Turn command-reference callouts into a searchable, categorized command-card library with exact-copy actions.
 - Work on Obsidian Desktop, iOS, and Android without a local server or Electron-only APIs.
 
 ### Install from Source
@@ -84,6 +85,7 @@ Built-in templates:
 
 - **Book Editorial**: a book-like single-column layout with a cover title area and paper-inspired light and dark themes.
 - **Magazine Research**: a deep-navy masthead, coral and sage accents, a combined contents and Properties band, and a broad research-reading column.
+- **Command Library**: a dense categorized command reference with search, category navigation, and one-click command copy.
 
 Templates style headings, Properties, contents, prose, quotes, callouts, tables, code, tasks, math, embeds, and footnotes. Obsidian's native renderer remains responsible for Markdown syntax and other plugin processors.
 
@@ -116,6 +118,34 @@ Template packages live in the Vault:
 ```
 
 Templates may contain HTML, CSS, themes, and local assets. Template scripts, external resources, forms, frames, and event-handler attributes are rejected.
+
+### Command Library Notes
+
+Choose **Command Library** in **Template & theme**, map it to a folder, or select it in frontmatter. Use `##` headings for categories and standard Obsidian `[!command]` callouts for command cards:
+
+````markdown
+---
+html-preview.template: command-library
+html-preview.theme: light
+---
+
+## Git
+
+> [!command] Undo the latest commit
+> ```bash
+> git reset --soft HEAD~1
+> ```
+> Keep staged changes while removing the most recent commit.
+
+## Docker
+
+> [!command] Follow API logs
+> ```bash
+> docker compose logs -f api
+> ```
+````
+
+In Enhanced reading, category buttons navigate to each `##` section, `/` focuses search, and `Escape` clears it. Search matches category name, card title, command text, and description. The copy control returns the exact text from the first fenced code block, including multiline commands. A `[!command]` callout without a fenced code block remains a normal callout, and the Markdown source is never changed.
 
 ### Data and Sync
 
@@ -175,6 +205,7 @@ HTML Preview 让 HTML 成为 Obsidian 中的一等文件类型。将外部保存
 - 在右侧“注释”栏查看当前文件的原文摘录、批注正文和仅高亮项目，点击条目即可定位正文。
 - 使用 Obsidian 原生 `MarkdownRenderer` 渲染 Markdown，再应用可配置的阅读布局和主题。
 - 支持全局默认 Markdown 模板和主题、按文件夹映射模板，以及 frontmatter 覆盖。
+- 将命令参考 Callout 转换为可搜索、可分类、可精确复制的命令卡片库。
 - 支持 Obsidian Desktop、iOS 和 Android，不需要本地服务器或 Electron 专用 API。
 
 ### 从源码安装
@@ -239,6 +270,7 @@ Markdown 源码和原生预览模式保持不变。通过 Markdown 视图中的 
 
 - **Book Editorial**：书籍式单栏布局、封面标题区、纸张风格的浅色和深色主题。
 - **Magazine Research**：深海军蓝刊头、珊瑚红与鼠尾草绿点缀、目录与 Properties 信息带、宽幅研究阅读栏。
+- **Command Library**：高密度分类命令参考页，包含搜索、分类导航和一键复制命令。
 
 模板会处理标题、Properties、目录、正文、引用、Callout、表格、代码、任务、数学公式、嵌入和脚注等展示结构。Markdown 语法和其他插件处理器仍由 Obsidian 原生渲染器负责。
 
@@ -271,6 +303,34 @@ html-preview.theme: dark
 ```
 
 模板只能包含 HTML、CSS、主题和本地资源；不允许模板脚本、外部资源、表单、frame 或事件处理器属性。
+
+### Command Library 命令笔记
+
+可在 **Template & theme** 中选择 **Command Library**，通过文件夹映射应用，或在 frontmatter 中指定。使用 `##` 作为分类，使用标准 Obsidian `[!command]` Callout 作为命令卡片：
+
+````markdown
+---
+html-preview.template: command-library
+html-preview.theme: light
+---
+
+## Git
+
+> [!command] 撤销最近一次提交
+> ```bash
+> git reset --soft HEAD~1
+> ```
+> 删除最近一次提交，但保留暂存区中的修改。
+
+## Docker
+
+> [!command] 持续查看 API 日志
+> ```bash
+> docker compose logs -f api
+> ```
+````
+
+在增强阅读中，分类按钮会定位到对应的 `##` 区块；按 `/` 聚焦搜索，按 `Escape` 清空搜索。搜索会匹配分类名、卡片标题、命令文本和说明。复制控件会精确复制第一个代码块的文本，包括多行命令。没有代码块的 `[!command]` 会保持为普通 Callout，Markdown 源文件不会被修改。
 
 ### 数据与同步
 

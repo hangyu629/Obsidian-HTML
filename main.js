@@ -2100,7 +2100,7 @@ __export(main_exports, {
   default: () => HtmlPreviewPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian13 = require("obsidian");
+var import_obsidian14 = require("obsidian");
 
 // src/annotations/types.ts
 var ANNOTATION_COLORS = [
@@ -6139,7 +6139,7 @@ var HtmlPreviewSettingTab = class extends import_obsidian9.PluginSettingTab {
 };
 
 // src/markdown/enhanced-markdown-view.ts
-var import_obsidian11 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 
 // src/annotations/contextual-ui.ts
 var COLOR_LABELS2 = {
@@ -6521,7 +6521,7 @@ function focusAnnotationMark(root, id) {
 }
 
 // src/markdown/render-document.ts
-var import_obsidian10 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 
 // src/markdown/css-scope.ts
 function assertNoExternalResources(css) {
@@ -6696,6 +6696,503 @@ function scopeTemplateCss(css, rootSelector) {
   }
   return scopeRules(css, rootSelector);
 }
+
+// src/markdown/command-library.ts
+var import_obsidian10 = require("obsidian");
+function commandCallouts(nodes) {
+  const callouts = [];
+  for (const node of nodes) {
+    if (node.matches('.callout[data-callout="command"]')) {
+      callouts.push(node);
+    }
+    callouts.push(...node.querySelectorAll('.callout[data-callout="command"]'));
+  }
+  return callouts.filter((callout) => callout.querySelector("pre > code"));
+}
+function categorySlug(value) {
+  return value.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "commands";
+}
+function groupContent(content) {
+  const groups = [{ heading: null, nodes: [] }];
+  for (const node of [...content.children]) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (node.tagName === "H2") {
+      groups.push({ heading: node, nodes: [node] });
+    } else {
+      const current = groups.at(-1);
+      if (current) current.nodes.push(node);
+    }
+  }
+  return groups;
+}
+function enhanceCallout(callout, categoryName) {
+  const code = callout.querySelector("pre > code");
+  if (!code) return;
+  callout.classList.add("command-library-card");
+  callout.dataset.commandCategory = categoryName;
+  const title = callout.querySelector(".callout-title");
+  if (!title || title.querySelector(".command-library-copy")) return;
+  const language = code.className.match(/(?:^|\s)language-([^\s]+)/)?.[1];
+  if (language) {
+    const languageLabel = document.createElement("span");
+    languageLabel.className = "command-library-language";
+    languageLabel.textContent = language;
+    title.append(languageLabel);
+  }
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "command-library-copy";
+  copy.dataset.commandText = code.textContent ?? "";
+  copy.setAttribute("aria-label", "Copy command");
+  (0, import_obsidian10.setIcon)(copy, "copy");
+  title.append(copy);
+}
+function setActiveCategory(categories, targetId) {
+  for (const button of categories.querySelectorAll(".command-library-category-button")) {
+    button.dataset.active = String(button.dataset.categoryTarget === targetId);
+  }
+}
+function categoryButtonFor(root, targetId) {
+  return [...root.querySelectorAll(".command-library-category-button")].find((button) => button.dataset.categoryTarget === targetId);
+}
+function categoryFor(root, targetId) {
+  return [...root.querySelectorAll(".command-library-category")].find((section) => section.id === targetId);
+}
+function filterCards(root, query) {
+  const normalized = query.trim().toLocaleLowerCase();
+  let visibleCount = 0;
+  for (const section of root.querySelectorAll(".command-library-category")) {
+    let sectionVisible = false;
+    for (const card of section.querySelectorAll(".command-library-card")) {
+      const haystack = `${card.dataset.commandCategory ?? ""} ${card.textContent ?? ""}`.toLocaleLowerCase();
+      card.hidden = normalized.length > 0 && !haystack.includes(normalized);
+      sectionVisible ||= !card.hidden;
+      if (!card.hidden) visibleCount += 1;
+    }
+    section.hidden = normalized.length > 0 && !sectionVisible;
+    const button = categoryButtonFor(root, section.id);
+    if (button) button.hidden = section.hidden;
+  }
+  const empty = root.querySelector("[data-command-library-empty]");
+  if (empty) empty.hidden = visibleCount > 0;
+}
+function mountCommandLibrary(input) {
+  const content = input.root.querySelector('[data-slot="content"]');
+  const categories = input.root.querySelector("[data-command-library-categories]");
+  const introduction = input.root.querySelector("[data-command-library-introduction]");
+  const empty = input.root.querySelector("[data-command-library-empty]");
+  if (!content || !categories) {
+    return { categoryCount: 0, commandCount: 0 };
+  }
+  categories.replaceChildren();
+  const groups = groupContent(content);
+  const introductionGroup = groups[0];
+  const hasHeadings = groups.some((group) => group.heading);
+  if (hasHeadings && introduction && introductionGroup) {
+    introduction.replaceChildren(...introductionGroup.nodes);
+  }
+  const candidates = hasHeadings ? groups.filter((group) => group.heading) : [{ heading: null, nodes: introductionGroup?.nodes ?? [] }];
+  const idCounts = /* @__PURE__ */ new Map();
+  let commandCount = 0;
+  let categoryCount = 0;
+  for (const group of candidates) {
+    const callouts = commandCallouts(group.nodes);
+    if (callouts.length === 0) continue;
+    const name = group.heading?.textContent?.trim() || "Commands";
+    const slug = categorySlug(name);
+    const occurrence = (idCounts.get(slug) ?? 0) + 1;
+    idCounts.set(slug, occurrence);
+    const section = document.createElement("section");
+    section.className = "command-library-category";
+    section.id = `command-category-${slug}${occurrence === 1 ? "" : `-${occurrence}`}`;
+    const first = group.nodes[0];
+    first?.before(section);
+    section.append(...group.nodes);
+    for (const callout of callouts) enhanceCallout(callout, name);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "command-library-category-button";
+    button.dataset.categoryTarget = section.id;
+    const label = document.createElement("span");
+    label.textContent = name;
+    const count = document.createElement("span");
+    count.className = "command-library-category-count";
+    count.textContent = String(callouts.length);
+    button.append(label, count);
+    categories.append(button);
+    categoryCount += 1;
+    commandCount += callouts.length;
+  }
+  if (empty) empty.hidden = commandCount > 0;
+  const search = input.root.querySelector("[data-command-library-search]");
+  if (search) {
+    input.component.registerDomEvent(search, "input", () => {
+      filterCards(input.root, search.value);
+    });
+  }
+  input.component.registerDomEvent(input.root, "keydown", (event) => {
+    if (!(event instanceof KeyboardEvent)) return;
+    if (event.key === "/" && search && document.activeElement !== search && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+      event.preventDefault();
+      search.focus();
+    } else if (event.key === "Escape" && search && search.value) {
+      search.value = "";
+      filterCards(input.root, "");
+    }
+  });
+  input.component.registerDomEvent(categories, "click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest(".command-library-category-button");
+    if (!button) return;
+    const targetId = button.dataset.categoryTarget;
+    const target = targetId ? categoryFor(input.root, targetId) : null;
+    if (!target) return;
+    setActiveCategory(categories, target.id);
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  input.component.registerDomEvent(content, "click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest(".command-library-copy");
+    if (!button) return;
+    const command = button.dataset.commandText ?? "";
+    void input.copyText(command).then(() => {
+      button.dataset.copyState = "copied";
+      button.setAttribute("aria-label", "Command copied");
+      (0, import_obsidian10.setIcon)(button, "check");
+      const timeout = window.setTimeout(() => {
+        delete button.dataset.copyState;
+        button.setAttribute("aria-label", "Copy command");
+        (0, import_obsidian10.setIcon)(button, "copy");
+      }, 1200);
+      input.component.register(() => window.clearTimeout(timeout));
+    }).catch(() => {
+      input.showNotice("Unable to copy command.");
+    });
+  });
+  const firstButton = categories.querySelector(".command-library-category-button");
+  if (firstButton?.dataset.categoryTarget) {
+    setActiveCategory(categories, firstButton.dataset.categoryTarget);
+  }
+  return { categoryCount, commandCount };
+}
+
+// src/markdown/templates/command-library.ts
+var COMMAND_LIBRARY_TEMPLATE_ID = "command-library";
+var COMMAND_LIBRARY_TEMPLATE = {
+  layout: `
+    <article class="command-library-page">
+      <header class="command-library-header">
+        <div class="command-library-heading">
+          <div class="command-library-kicker">Command library</div>
+          <div class="command-library-title" data-slot="title"></div>
+        </div>
+        <label class="command-library-search">
+          <span class="command-library-search-label">Search commands</span>
+          <input data-command-library-search type="search" placeholder="Search commands" autocomplete="off">
+        </label>
+      </header>
+      <div class="command-library-shell">
+        <nav class="command-library-categories" data-command-library-categories aria-label="Command categories"></nav>
+        <main class="command-library-main">
+          <section class="command-library-introduction" data-command-library-introduction></section>
+          <p class="command-library-empty" data-command-library-empty hidden>No matching commands.</p>
+          <section class="command-library-content" data-slot="content"></section>
+        </main>
+      </div>
+    </article>`,
+  manifest: {
+    defaultTheme: "light",
+    description: "Searchable categorized command cards for operational reference notes.",
+    id: COMMAND_LIBRARY_TEMPLATE_ID,
+    name: "Command Library",
+    themes: [
+      { id: "light", name: "Light library", stylesheet: "themes/light.css" },
+      { id: "dark", name: "Dark library", stylesheet: "themes/dark.css" }
+    ],
+    version: 1
+  },
+  styles: `
+    * { box-sizing: border-box; }
+    .command-library-page {
+      min-height: 100%;
+      overflow-x: hidden;
+      background: var(--command-canvas);
+      color: var(--command-ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .command-library-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 2rem;
+      padding: clamp(2.25rem, 6vw, 4.6rem) clamp(1.4rem, 6vw, 5rem) 2rem;
+      border-bottom: 1px solid var(--command-rule);
+      background: var(--command-header);
+    }
+    .command-library-heading { min-width: 0; }
+    .command-library-kicker {
+      margin-bottom: .65rem;
+      color: var(--command-accent);
+      font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .command-library-title {
+      max-width: 46rem;
+      font-size: clamp(2rem, 5vw, 3.6rem);
+      font-weight: 720;
+      letter-spacing: 0;
+      line-height: 1.08;
+      overflow-wrap: anywhere;
+    }
+    .command-library-search {
+      display: grid;
+      grid-template-columns: auto minmax(10rem, 17rem);
+      align-items: center;
+      gap: .6rem;
+      flex: 0 1 24rem;
+      min-height: 2.5rem;
+      padding: 0 .7rem;
+      border: 1px solid var(--command-rule-strong);
+      border-radius: 6px;
+      background: var(--command-raised);
+    }
+    .command-library-search-label {
+      color: var(--command-muted);
+      font-family: ui-monospace, monospace;
+      font-size: .67rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .command-library-search input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      color: var(--command-ink);
+      background: transparent;
+      font: inherit;
+      font-size: .86rem;
+    }
+    .command-library-search:focus-within { border-color: var(--command-accent); box-shadow: 0 0 0 2px var(--command-focus); }
+    .command-library-search input::placeholder { color: var(--command-muted); }
+    .command-library-shell {
+      display: grid;
+      grid-template-columns: minmax(10.5rem, 15rem) minmax(0, 1fr);
+      gap: clamp(1.5rem, 4vw, 4.2rem);
+      width: min(1180px, calc(100% - 3rem));
+      margin: 0 auto;
+      padding: 2.5rem 0 6rem;
+    }
+    .command-library-categories {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+      display: grid;
+      gap: .32rem;
+      max-height: calc(100vh - 2rem);
+      overflow: auto;
+      padding-right: .55rem;
+    }
+    .command-library-category-button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      width: 100%;
+      min-height: 2.25rem;
+      padding: .45rem .6rem .45rem .72rem;
+      border: 1px solid transparent;
+      border-left: 3px solid transparent;
+      border-radius: 5px;
+      color: var(--command-muted);
+      background: transparent;
+      font: inherit;
+      font-size: .82rem;
+      text-align: left;
+      cursor: pointer;
+    }
+    .command-library-category-button:hover { color: var(--command-ink); background: var(--command-hover); }
+    .command-library-category-button[data-active="true"] { border-color: var(--command-rule); border-left-color: var(--command-accent); color: var(--command-ink); background: var(--command-raised); font-weight: 700; }
+    .command-library-category-count { color: var(--command-accent-quiet); font-family: ui-monospace, monospace; font-size: .67rem; }
+    .command-library-main { min-width: 0; }
+    .command-library-introduction {
+      color: var(--command-muted);
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+    .command-library-introduction:empty { display: none; }
+    .command-library-introduction > :first-child { margin-top: 0; }
+    .command-library-introduction > :last-child { margin-bottom: 2.4rem; }
+    .command-library-empty {
+      margin: 0;
+      padding: 1.4rem;
+      border: 1px dashed var(--command-rule-strong);
+      border-radius: 6px;
+      color: var(--command-muted);
+      background: var(--command-raised);
+      text-align: center;
+    }
+    .command-library-category { scroll-margin-top: 1.25rem; }
+    .command-library-category + .command-library-category { margin-top: 3.5rem; }
+    .command-library-category > h2 {
+      margin: 0 0 1rem;
+      padding-bottom: .65rem;
+      border-bottom: 1px solid var(--command-rule);
+      color: var(--command-ink);
+      font-size: 1.55rem;
+      font-weight: 720;
+      letter-spacing: 0;
+      line-height: 1.18;
+    }
+    .command-library-card {
+      display: block;
+      margin: .75rem 0;
+      border: 1px solid var(--command-rule);
+      border-left: 3px solid var(--command-card-accent, var(--command-accent));
+      border-radius: 6px;
+      background: var(--command-raised);
+      box-shadow: 0 1px 0 var(--command-shadow);
+      overflow: hidden;
+    }
+    .command-library-card:nth-of-type(3n + 1) { --command-card-accent: var(--command-accent); }
+    .command-library-card:nth-of-type(3n + 2) { --command-card-accent: var(--command-blue); }
+    .command-library-card:nth-of-type(3n) { --command-card-accent: var(--command-amber); }
+    .command-library-card .callout-title {
+      display: flex;
+      align-items: center;
+      min-height: 2.8rem;
+      gap: .65rem;
+      padding: .65rem .75rem .65rem .95rem;
+      border-bottom: 1px solid var(--command-rule);
+      color: var(--command-ink);
+      background: var(--command-card-header);
+      font-size: .9rem;
+      font-weight: 720;
+    }
+    .command-library-card .callout-icon { display: none; }
+    .command-library-card .callout-title-inner { min-width: 0; overflow-wrap: anywhere; }
+    .command-library-language {
+      margin-left: auto;
+      color: var(--command-accent-quiet);
+      font-family: ui-monospace, monospace;
+      font-size: .64rem;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .command-library-copy {
+      display: grid;
+      place-items: center;
+      flex: 0 0 1.9rem;
+      width: 1.9rem;
+      height: 1.9rem;
+      margin-left: .15rem;
+      padding: 0;
+      border: 1px solid var(--command-rule-strong);
+      border-radius: 4px;
+      color: var(--command-accent);
+      background: var(--command-raised);
+      cursor: pointer;
+    }
+    .command-library-copy:hover { color: var(--command-accent-strong); border-color: var(--command-accent); }
+    .command-library-copy[data-copy-state="copied"] { color: var(--command-success); border-color: var(--command-success); }
+    .command-library-copy svg { width: .9rem; height: .9rem; }
+    .command-library-card .callout-content { padding: .85rem .95rem .95rem; }
+    .command-library-card pre {
+      margin: 0 0 .75rem;
+      padding: .85rem .9rem;
+      overflow-x: auto;
+      border: 1px solid var(--command-code-rule);
+      border-radius: 4px;
+      background: var(--command-code-bg);
+      color: var(--command-code-ink);
+      font: .78rem/1.55 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+      tab-size: 2;
+    }
+    .command-library-card pre code { padding: 0; background: transparent; color: inherit; font: inherit; }
+    .command-library-card .callout-content > :last-child { margin-bottom: 0; }
+    .command-library-card p,
+    .command-library-card li { color: var(--command-muted); font-size: .9rem; line-height: 1.58; }
+    .command-library-card p { margin: .65rem 0; }
+    .command-library-card ul,
+    .command-library-card ol { margin: .65rem 0; padding-left: 1.35rem; }
+    .command-library-content > p,
+    .command-library-content > ul,
+    .command-library-content > ol,
+    .command-library-content > table,
+    .command-library-content > blockquote { margin: 1.1rem 0; }
+    .command-library-content a { color: var(--command-link); text-underline-offset: 3px; }
+    .command-library-content blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid var(--command-blue); color: var(--command-muted); }
+    .command-library-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+    .command-library-content th,
+    .command-library-content td { padding: .55rem .7rem; border-bottom: 1px solid var(--command-rule); text-align: left; vertical-align: top; }
+    @media (max-width: 760px) {
+      .command-library-header { align-items: stretch; flex-direction: column; gap: 1.25rem; padding: 2.2rem 1rem 1.35rem; }
+      .command-library-search { grid-template-columns: auto minmax(0, 1fr); flex-basis: auto; }
+      .command-library-shell { display: block; width: min(100% - 2rem, 760px); padding-top: 1rem; }
+      .command-library-categories { position: static; display: flex; max-width: none; max-height: none; overflow-x: auto; padding: 0 0 .9rem; border-bottom: 1px solid var(--command-rule); }
+      .command-library-category-button { flex: 0 0 auto; width: auto; min-height: 2rem; }
+      .command-library-category + .command-library-category { margin-top: 2.5rem; }
+      .command-library-card .callout-title { padding-left: .75rem; }
+      .command-library-card .callout-content { padding: .75rem; }
+    }
+  `,
+  themes: {
+    light: `:root {
+      color-scheme: light;
+      --command-canvas: #f2f5f3;
+      --command-header: #e7eeea;
+      --command-raised: #fbfcfa;
+      --command-card-header: #f5f8f6;
+      --command-hover: #eaf1ed;
+      --command-ink: #202a27;
+      --command-muted: #64716b;
+      --command-rule: #d6dfd9;
+      --command-rule-strong: #b9c8bf;
+      --command-accent: #25715f;
+      --command-accent-strong: #195746;
+      --command-accent-quiet: #5f8578;
+      --command-blue: #39739d;
+      --command-amber: #b67c24;
+      --command-success: #23804d;
+      --command-link: #236a85;
+      --command-focus: rgba(37, 113, 95, .18);
+      --command-shadow: rgba(35, 57, 47, .05);
+      --command-code-bg: #17241f;
+      --command-code-ink: #e4f0e9;
+      --command-code-rule: #294338;
+    }`,
+    dark: `:root {
+      color-scheme: dark;
+      --command-canvas: #141b1a;
+      --command-header: #101716;
+      --command-raised: #1b2421;
+      --command-card-header: #202b27;
+      --command-hover: #27342f;
+      --command-ink: #e6ece7;
+      --command-muted: #adbab2;
+      --command-rule: #35443e;
+      --command-rule-strong: #506158;
+      --command-accent: #76c3a6;
+      --command-accent-strong: #9dd9bd;
+      --command-accent-quiet: #9cc9b6;
+      --command-blue: #82b6dc;
+      --command-amber: #dfae5f;
+      --command-success: #79cf91;
+      --command-link: #91c9e3;
+      --command-focus: rgba(118, 195, 166, .22);
+      --command-shadow: rgba(0, 0, 0, .18);
+      --command-code-bg: #0e1513;
+      --command-code-ink: #dcece3;
+      --command-code-rule: #32483d;
+    }`
+  }
+};
 
 // src/markdown/templates/built-in.ts
 var BUILT_IN_TEMPLATE_ID = "book-editorial";
@@ -6956,7 +7453,8 @@ var MAGAZINE_RESEARCH_TEMPLATE = {
 };
 var BUILT_IN_TEMPLATES = [
   BUILT_IN_TEMPLATE,
-  MAGAZINE_RESEARCH_TEMPLATE
+  MAGAZINE_RESEARCH_TEMPLATE,
+  COMMAND_LIBRARY_TEMPLATE
 ];
 function builtInTemplateFor(templateId) {
   return BUILT_IN_TEMPLATES.find((template) => template.manifest.id === templateId);
@@ -7273,6 +7771,10 @@ function resolveCssAssets(css, templateId, resolveAsset, dependencies) {
     return `url(${quote}${resolved}${quote})`;
   });
 }
+async function copyCommandText(text) {
+  if (!navigator.clipboard) throw new Error("Clipboard is unavailable.");
+  await navigator.clipboard.writeText(text);
+}
 async function renderEnhancedMarkdown(input) {
   const template = input.template.manifest.id ? input.template : BUILT_IN_TEMPLATE;
   const parsed = new DOMParser().parseFromString(template.layout, "text/html");
@@ -7299,7 +7801,7 @@ async function renderEnhancedMarkdown(input) {
   if (propertiesSlot instanceof HTMLElement) {
     renderProperties(propertiesSlot, input.frontmatter ?? {});
   }
-  await import_obsidian10.MarkdownRenderer.render(
+  await import_obsidian11.MarkdownRenderer.render(
     input.app,
     input.source,
     contentSlot,
@@ -7308,6 +7810,15 @@ async function renderEnhancedMarkdown(input) {
   );
   const tocSlot = input.root.querySelector('[data-slot="toc"]');
   if (tocSlot instanceof HTMLElement) renderToc(tocSlot, contentSlot);
+  if (template.manifest.id === COMMAND_LIBRARY_TEMPLATE_ID) {
+    mountCommandLibrary({
+      component: input.component,
+      copyText: input.copyText ?? copyCommandText,
+      root: input.root,
+      showNotice: input.showNotice ?? (() => {
+      })
+    });
+  }
   const themeId = input.themeId ?? template.manifest.defaultTheme;
   const theme = template.themes[themeId] ?? template.themes[template.manifest.defaultTheme] ?? "";
   const css = resolveCssAssets(`${template.styles}
@@ -7323,7 +7834,7 @@ ${theme}`, template.manifest.id, input.resolveAsset, dependencies);
 // src/markdown/enhanced-markdown-view.ts
 var ENHANCED_MARKDOWN_VIEW_TYPE = "enhanced-markdown";
 var nextViewId2 = 0;
-var EnhancedMarkdownView = class extends import_obsidian11.FileView {
+var EnhancedMarkdownView = class extends import_obsidian12.FileView {
   constructor(leaf, environment) {
     super(leaf);
     this.environment = environment;
@@ -7373,7 +7884,7 @@ var EnhancedMarkdownView = class extends import_obsidian11.FileView {
     }
     const path = typeof state.file === "string" ? state.file : void 0;
     const nextFile = path ? this.app.vault.getAbstractFileByPath(path) : null;
-    if (nextFile instanceof import_obsidian11.TFile || nextFile) {
+    if (nextFile instanceof import_obsidian12.TFile || nextFile) {
       await this.onLoadFile(nextFile);
     }
   }
@@ -7518,15 +8029,17 @@ var EnhancedMarkdownView = class extends import_obsidian11.FileView {
       if (token !== this.renderToken || this.file?.path !== file.path) return;
       const root = document.createElement("article");
       root.className = "enhanced-markdown-document";
-      const component = new import_obsidian11.Component();
+      const component = new import_obsidian12.Component();
       const result = await renderEnhancedMarkdown({
         app: this.app,
         component,
+        copyText: (text) => navigator.clipboard.writeText(text),
         frontmatter: typeof frontmatter === "object" && frontmatter !== null ? frontmatter : void 0,
         resolveAsset: this.environment.resolveAsset,
         root,
         source,
         sourcePath: file.path,
+        showNotice: this.environment.showNotice,
         template,
         themeId: selection.themeId
       });
@@ -7778,8 +8291,8 @@ function resolveMarkdownTemplate(sourcePath, frontmatter, settings, available, m
 }
 
 // src/markdown/template-modal.ts
-var import_obsidian12 = require("obsidian");
-var MarkdownTemplateModal = class extends import_obsidian12.Modal {
+var import_obsidian13 = require("obsidian");
+var MarkdownTemplateModal = class extends import_obsidian13.Modal {
   constructor(app, environment) {
     super(app);
     this.environment = environment;
@@ -7929,7 +8442,7 @@ var ReaderPageStore = class {
 };
 
 // src/main.ts
-var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
+var HtmlPreviewPlugin = class extends import_obsidian14.Plugin {
   coordinator = new PreviewCoordinator();
   annotationStore;
   annotationService;
@@ -7950,7 +8463,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
     this.cleanupStore = new CleanupRuleStore(
       this.app.vault.adapter,
       ({ message, path }) => {
-        new import_obsidian13.Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
+        new import_obsidian14.Notice(`HTML Preview cleanup data error in ${path}: ${message}`);
       }
     );
     this.readerPageStore = new ReaderPageStore(this.app.vault.adapter);
@@ -7973,9 +8486,9 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
         saveAnnotation: (sourcePath, annotation) => this.annotationService.save(sourcePath, annotation),
         copyText: async (text) => {
           await navigator.clipboard.writeText(text);
-          new import_obsidian13.Notice("\u5DF2\u590D\u5236\u6458\u5F55\u548C\u6279\u6CE8");
+          new import_obsidian14.Notice("\u5DF2\u590D\u5236\u6458\u5F55\u548C\u6279\u6CE8");
         },
-        showNotice: (message) => new import_obsidian13.Notice(message)
+        showNotice: (message) => new import_obsidian14.Notice(message)
       })
     );
     this.registerView(
@@ -7994,7 +8507,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
         },
         resolveAsset: (path) => {
           const file = this.app.vault.getAbstractFileByPath(path);
-          return file instanceof import_obsidian13.TFile ? this.app.vault.getResourcePath(file) : null;
+          return file instanceof import_obsidian14.TFile ? this.app.vault.getResourcePath(file) : null;
         },
         resolveTemplate: (path, frontmatter, mode) => resolveMarkdownTemplate(
           path,
@@ -8004,7 +8517,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
           mode
         ),
         showNotice: (message) => {
-          new import_obsidian13.Notice(message);
+          new import_obsidian14.Notice(message);
         }
       })
     );
@@ -8022,7 +8535,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
         },
         readerPageStore: this.readerPageStore,
         showNotice: (message) => {
-          new import_obsidian13.Notice(message);
+          new import_obsidian14.Notice(message);
         }
       })
     );
@@ -8034,7 +8547,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
       callback: () => {
         const leaf = this.app.workspace.getMostRecentLeaf();
         const file = leaf?.view?.file;
-        if (file instanceof import_obsidian13.TFile) void this.openEnhancedMarkdown(file.path, "manual");
+        if (file instanceof import_obsidian14.TFile) void this.openEnhancedMarkdown(file.path, "manual");
       }
     });
     this.addCommand({
@@ -8069,14 +8582,14 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
     });
     this.registerEvent(
       this.app.vault.on("modify", (file) => {
-        if (file instanceof import_obsidian13.TFile) {
+        if (file instanceof import_obsidian14.TFile) {
           this.coordinator.notify(file.path);
         }
       })
     );
     this.registerEvent(
       this.app.vault.on("create", (file) => {
-        if (file instanceof import_obsidian13.TFile) {
+        if (file instanceof import_obsidian14.TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
         }
@@ -8084,7 +8597,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
     );
     this.registerEvent(
       this.app.vault.on("delete", (file) => {
-        if (file instanceof import_obsidian13.TFile) {
+        if (file instanceof import_obsidian14.TFile) {
           this.knownVaultPaths.delete(file.path);
           this.coordinator.notify(file.path);
         }
@@ -8094,13 +8607,13 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
       this.app.vault.on("rename", (file, oldPath) => {
         this.knownVaultPaths.delete(oldPath);
         this.coordinator.notify(oldPath);
-        if (file instanceof import_obsidian13.TFile) {
+        if (file instanceof import_obsidian14.TFile) {
           this.knownVaultPaths.add(file.path);
           this.coordinator.notify(file.path);
           if (isHtmlPath(oldPath) || isHtmlPath(file.path)) {
             void this.cleanupStore.migrateFile(oldPath, file.path).catch((error) => {
               const detail = error instanceof Error ? error.message : String(error);
-              new import_obsidian13.Notice(`Could not migrate HTML cleanup rules: ${detail}`);
+              new import_obsidian14.Notice(`Could not migrate HTML cleanup rules: ${detail}`);
             });
           }
         }
@@ -8143,7 +8656,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
     )[0];
     const leaf = existing ?? this.app.workspace.getRightLeaf(false);
     if (!leaf) {
-      new import_obsidian13.Notice("\u65E0\u6CD5\u6253\u5F00\u6CE8\u91CA\u4FA7\u680F\u3002");
+      new import_obsidian14.Notice("\u65E0\u6CD5\u6253\u5F00\u6CE8\u91CA\u4FA7\u680F\u3002");
       return;
     }
     if (!existing) {
@@ -8154,8 +8667,8 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
   }
   async updateAnnotationSidebars(activeLeaf) {
     const file = activeLeaf?.view?.file;
-    const extension = file instanceof import_obsidian13.TFile ? file.extension.toLowerCase() : "";
-    let sourcePath = file instanceof import_obsidian13.TFile && (extension === "html" || extension === "htm" || extension === "md") ? file.path : null;
+    const extension = file instanceof import_obsidian14.TFile ? file.extension.toLowerCase() : "";
+    let sourcePath = file instanceof import_obsidian14.TFile && (extension === "html" || extension === "htm" || extension === "md") ? file.path : null;
     if (sourcePath) {
       this.lastAnnotationSourcePath = sourcePath;
     } else if (activeLeaf?.view?.getViewType?.() === ANNOTATION_SIDEBAR_VIEW_TYPE) {
@@ -8192,7 +8705,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
     this.enhancedLeaves.add(view);
     view.addAction?.("book-open-check", "Enhanced reading", () => {
       const file = view.file;
-      if (file instanceof import_obsidian13.TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
+      if (file instanceof import_obsidian14.TFile) void this.openEnhancedMarkdown(file.path, "manual", leaf);
     });
   }
   async maybeAutoOpen(leaf) {
@@ -8200,7 +8713,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
       return;
     }
     const file = leaf.view.file;
-    if (!(file instanceof import_obsidian13.TFile)) return;
+    if (!(file instanceof import_obsidian14.TFile)) return;
     if (this.nativeMarkdownPaths.get(leaf) === file.path) return;
     this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
@@ -8236,7 +8749,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
   }
   async openEnhancedMarkdown(sourcePath, mode, leaf = this.app.workspace.getMostRecentLeaf(), selected) {
     const file = this.app.vault.getAbstractFileByPath(sourcePath);
-    if (!(file instanceof import_obsidian13.TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
+    if (!(file instanceof import_obsidian14.TFile) || file.extension.toLowerCase() !== "md" || !leaf) return;
     this.nativeMarkdownPaths.delete(leaf);
     const frontmatter = this.app.metadataCache?.getFileCache(file)?.frontmatter ?? {};
     const selection = selected ? { source: "default", ...selected } : resolveMarkdownTemplate(
@@ -8247,7 +8760,7 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
       mode
     );
     if (!selection) {
-      new import_obsidian13.Notice("No valid Markdown template is available for this note.");
+      new import_obsidian14.Notice("No valid Markdown template is available for this note.");
       return;
     }
     const returnMode = leaf.view?.getMode?.() === "source" ? "source" : "preview";
@@ -8278,20 +8791,20 @@ var HtmlPreviewPlugin = class extends import_obsidian13.Plugin {
     const path = annotationExportPath(sourcePath);
     const content = exportAnnotationMarkdown(sourcePath, annotations);
     const existing = this.app.vault.getAbstractFileByPath(path);
-    if (existing instanceof import_obsidian13.TFile) {
+    if (existing instanceof import_obsidian14.TFile) {
       await this.app.vault.modify(existing, content);
     } else if (existing) {
       throw new Error(`\u65E0\u6CD5\u5BFC\u51FA\u6CE8\u91CA\uFF1A\u76EE\u6807\u8DEF\u5F84\u4E0D\u662F\u6587\u4EF6\uFF1A${path}`);
     } else {
       await this.app.vault.create(path, content);
     }
-    new import_obsidian13.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
+    new import_obsidian14.Notice(`\u6CE8\u91CA\u5DF2\u5BFC\u51FA\u5230 ${path}`);
   }
   openAnnotationSearch() {
     new AnnotationSearchModal(this.app, {
       open: async (sourcePath, id) => {
         const file = this.app.vault.getAbstractFileByPath(sourcePath);
-        if (!(file instanceof import_obsidian13.TFile)) return false;
+        if (!(file instanceof import_obsidian14.TFile)) return false;
         await this.app.workspace.openLinkText(sourcePath, "", false);
         await new Promise((resolve) => window.setTimeout(resolve, 0));
         return this.focusAnnotation(sourcePath, id);
