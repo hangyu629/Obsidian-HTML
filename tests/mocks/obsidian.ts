@@ -12,6 +12,10 @@ export class Component {
     this.cleanups.push(() => element.removeEventListener(type, callback));
   }
 
+  register(cleanup: () => void): void {
+    this.cleanups.push(cleanup);
+  }
+
   registerEvent(): void {}
 
   onunload(): void {
