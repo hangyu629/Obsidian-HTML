@@ -1,4 +1,5 @@
 import type { MarkdownTemplatePackage } from "./types";
+import { COMMAND_LIBRARY_TEMPLATE } from "./command-library";
 
 export const BUILT_IN_TEMPLATE_ID = "book-editorial";
 
@@ -261,7 +262,8 @@ const MAGAZINE_RESEARCH_TEMPLATE: MarkdownTemplatePackage = {
 
 export const BUILT_IN_TEMPLATES: readonly MarkdownTemplatePackage[] = [
   BUILT_IN_TEMPLATE,
-  MAGAZINE_RESEARCH_TEMPLATE
+  MAGAZINE_RESEARCH_TEMPLATE,
+  COMMAND_LIBRARY_TEMPLATE
 ];
 
 export function builtInTemplateFor(templateId: string): MarkdownTemplatePackage | undefined {

@@ -147,7 +147,9 @@ describe("mountCommandLibrary", () => {
     const copyText = vi.fn(async () => undefined);
     const { showNotice } = mount(root, { copyText });
 
-    root.querySelector<HTMLButtonElement>(".command-library-copy")!.click();
+    const copy = root.querySelector<HTMLButtonElement>(".command-library-copy")!;
+    expect(copy.dataset.icon).toBe("copy");
+    copy.click();
     await new Promise((resolve) => window.setTimeout(resolve, 0));
     expect(copyText).toHaveBeenCalledWith("git fetch origin\ngit rebase origin/main");
     expect(showNotice).not.toHaveBeenCalled();

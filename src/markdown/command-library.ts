@@ -1,4 +1,4 @@
-import type { Component } from "obsidian";
+import { setIcon, type Component } from "obsidian";
 
 export interface MountCommandLibraryInput {
   component: Component;
@@ -70,7 +70,7 @@ function enhanceCallout(callout: HTMLElement, categoryName: string): void {
   copy.className = "command-library-copy";
   copy.dataset.commandText = code.textContent ?? "";
   copy.setAttribute("aria-label", "Copy command");
-  copy.textContent = "Copy";
+  setIcon(copy, "copy");
   title.append(copy);
 }
 
@@ -205,9 +205,11 @@ export function mountCommandLibrary(input: MountCommandLibraryInput): CommandLib
     void input.copyText(command).then(() => {
       button.dataset.copyState = "copied";
       button.setAttribute("aria-label", "Command copied");
+      setIcon(button, "check");
       const timeout = window.setTimeout(() => {
         delete button.dataset.copyState;
         button.setAttribute("aria-label", "Copy command");
+        setIcon(button, "copy");
       }, 1200);
       input.component.register(() => window.clearTimeout(timeout));
     }).catch(() => {

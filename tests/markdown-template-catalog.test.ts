@@ -73,6 +73,14 @@ describe("MarkdownTemplateCatalog", () => {
       },
       {
         defaultTheme: "light",
+        description: "Searchable categorized command cards for operational reference notes.",
+        id: "command-library",
+        name: "Command Library",
+        themeIds: ["light", "dark"],
+        themeNames: { light: "Light library", dark: "Dark library" }
+      },
+      {
+        defaultTheme: "light",
         description: undefined,
         id: "editorial",
         name: "Editorial",
@@ -107,6 +115,7 @@ describe("MarkdownTemplateCatalog", () => {
     expect((await catalog.list()).map((template) => template.id)).toEqual([
       "book-editorial",
       "magazine-research",
+      "command-library",
       "editorial"
     ]);
   });
@@ -146,7 +155,8 @@ describe("MarkdownTemplateCatalog", () => {
     });
     expect((await catalog.list()).map((item) => item.id)).toEqual([
       BUILT_IN_TEMPLATE_ID,
-      "magazine-research"
+      "magazine-research",
+      "command-library"
     ]);
   });
 });

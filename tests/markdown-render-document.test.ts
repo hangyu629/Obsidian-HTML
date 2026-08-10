@@ -174,4 +174,37 @@ describe("renderEnhancedMarkdown", () => {
       expect(template?.styles).toContain(selector);
     }
   });
+
+  it("provides the command library layout, themes, and responsive card contract", () => {
+    const template = builtInTemplateFor("command-library");
+
+    expect(template?.manifest).toMatchObject({
+      id: "command-library",
+      name: "Command Library",
+      themes: expect.arrayContaining([
+        expect.objectContaining({ id: "light" }),
+        expect.objectContaining({ id: "dark" })
+      ])
+    });
+    for (const hook of [
+      'data-command-library-search',
+      'data-command-library-categories',
+      'data-command-library-introduction',
+      'data-command-library-empty',
+      'data-slot="content"'
+    ]) {
+      expect(template?.layout).toContain(hook);
+    }
+    for (const selector of [
+      ".command-library-page",
+      ".command-library-card",
+      ".command-library-category-button",
+      ".command-library-copy",
+      ".command-library-empty",
+      ".command-library-search",
+      "@media (max-width: 760px)"
+    ]) {
+      expect(template?.styles).toContain(selector);
+    }
+  });
 });
