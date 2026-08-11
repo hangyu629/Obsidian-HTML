@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -39,6 +41,23 @@ afterEach(() => {
 });
 
 describe("InsertCommandCardModal", () => {
+  it("owns dialog width without overflowing the modal content", () => {
+    const modal = openModal();
+    const css = readFileSync("styles.css", "utf8");
+
+    expect(modal.modalEl.classList.contains("command-card-insert-dialog")).toBe(true);
+    expect(css).toMatch(
+      /\.command-card-insert-dialog\s*\{[^}]*width:\s*min\(680px,\s*calc\(100vw - 32px\)\)/s
+    );
+    expect(css).toMatch(/\.command-card-modal\s*\{[^}]*width:\s*100%/s);
+    expect(css).not.toMatch(
+      /\.command-card-modal\s*\{[^}]*width:\s*min\(620px,\s*82vw\)/s
+    );
+
+    modal.close();
+    expect(modal.modalEl.classList.contains("command-card-insert-dialog")).toBe(false);
+  });
+
   it("renders structured fields with all supported languages", () => {
     const modal = openModal({
       initialCommand: "npm run check",

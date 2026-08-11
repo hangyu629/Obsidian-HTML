@@ -110,6 +110,7 @@ export class FileView extends ItemView {
 }
 
 export class Modal extends Component {
+  modalEl = document.createElement("div");
   contentEl = document.createElement("div");
   titleEl = document.createElement("h2");
   constructor(public app: unknown) {

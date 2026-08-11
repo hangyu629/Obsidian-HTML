@@ -62,6 +62,7 @@ export class InsertCommandCardModal extends Modal {
 
   onOpen(): void {
     this.submitted = false;
+    this.modalEl.classList.add("command-card-insert-dialog");
     this.titleEl.textContent = "Insert command card";
     this.contentEl.replaceChildren();
 
@@ -148,6 +149,7 @@ export class InsertCommandCardModal extends Modal {
   }
 
   onClose(): void {
+    this.modalEl.classList.remove("command-card-insert-dialog");
     this.contentEl.removeEventListener("keydown", this.handleKeydown);
     this.contentEl.replaceChildren();
     this.fields = null;

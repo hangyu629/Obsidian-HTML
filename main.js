@@ -8495,6 +8495,7 @@ var InsertCommandCardModal = class extends import_obsidian14.Modal {
   };
   onOpen() {
     this.submitted = false;
+    this.modalEl.classList.add("command-card-insert-dialog");
     this.titleEl.textContent = "Insert command card";
     this.contentEl.replaceChildren();
     const root = document.createElement("form");
@@ -8570,6 +8571,7 @@ var InsertCommandCardModal = class extends import_obsidian14.Modal {
     title.focus();
   }
   onClose() {
+    this.modalEl.classList.remove("command-card-insert-dialog");
     this.contentEl.removeEventListener("keydown", this.handleKeydown);
     this.contentEl.replaceChildren();
     this.fields = null;

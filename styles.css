@@ -926,10 +926,19 @@
   border-radius: 6px;
 }
 
+.command-card-insert-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+}
+
 .command-card-modal {
   display: grid;
   gap: 15px;
-  width: min(620px, 82vw);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .command-card-modal-intro {
@@ -941,7 +950,7 @@
 
 .command-card-modal-metadata {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, .42fr);
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 180px);
   gap: 12px;
 }
 
@@ -1027,10 +1036,6 @@
 }
 
 @media (max-width: 520px) {
-  .command-card-modal {
-    width: auto;
-  }
-
   .command-card-modal-metadata {
     grid-template-columns: 1fr;
   }
