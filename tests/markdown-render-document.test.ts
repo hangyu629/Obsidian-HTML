@@ -246,5 +246,11 @@ describe("renderEnhancedMarkdown", () => {
     ]) {
       expect(template?.styles).toContain(selector);
     }
+    expect(template?.styles).toMatch(
+      /\.command-library-card\s+\.copy-code-button\s*\{\s*display:\s*none;\s*\}/
+    );
+    expect(template?.styles).not.toMatch(
+      /(?:^|\n)\s*\.copy-code-button\s*\{/
+    );
   });
 });

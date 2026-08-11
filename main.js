@@ -7102,6 +7102,7 @@ var COMMAND_LIBRARY_TEMPLATE = {
     .command-library-copy:hover { color: var(--command-accent-strong); border-color: var(--command-accent); }
     .command-library-copy[data-copy-state="copied"] { color: var(--command-success); border-color: var(--command-success); }
     .command-library-copy svg { width: .9rem; height: .9rem; }
+    .command-library-card .copy-code-button { display: none; }
     .command-library-card .callout-content { padding: .85rem .95rem .95rem; }
     .command-library-card pre {
       margin: 0 0 .75rem;
